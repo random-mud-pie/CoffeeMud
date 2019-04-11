@@ -150,8 +150,13 @@ public class GModify extends StdCommand
 				else
 				{
 					final CMClass.CMObjectType type=CMClass.getObjectType(E);
-					final Environmental newObj=(Environmental)CMClass.getByType(value, type);
-					if((newObj instanceof Physical)&&(E instanceof Physical))
+					Environmental newObj=(Environmental)CMClass.getByType(value, type);
+					if(newObj == null)
+						newObj=CMClass.getUnknown(value);
+					if(newObj == null)
+						Log.errOut("GModify","Unknown class '"+value+"'");
+					if((newObj instanceof Physical)
+					&&(E instanceof Physical))
 					{
 						final Physical P1=(Physical)E;
 						final Physical P2=(Physical)newObj;
@@ -539,6 +544,8 @@ public class GModify extends StdCommand
 				{
 					Log.sysOut("GMODIFY","The "+CMStrings.capitalizeAndLower(field)+" field on "+E.Name()+" in "+room.roomID()+" was changed from "+getStat(E,field)+" to "+value+".");
 					E=setStat(E,field,value);
+					if(E==null)
+						return null;
 					didAnything=true;
 				}
 			}
