@@ -19,6 +19,7 @@ import com.planet_ink.coffee_mud.Common.interfaces.PlayerAccount.AccountFlag;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
 import com.planet_ink.coffee_mud.Libraries.interfaces.*;
+import com.planet_ink.coffee_mud.Libraries.interfaces.AbilityMapper.AbilityMapping;
 import com.planet_ink.coffee_mud.Libraries.interfaces.AchievementLibrary.Achievement;
 import com.planet_ink.coffee_mud.Libraries.interfaces.AchievementLibrary.AchievementLoadFlag;
 import com.planet_ink.coffee_mud.Libraries.interfaces.AchievementLibrary.Award;
@@ -826,13 +827,21 @@ public class DefaultClan implements Clan
 				M.tell(removeMsg);
 		}
 
-		// this is going to need to be smarter... get a list of all possible spell grants from all clans,
-		// check against class qualifications.  Form a list of forbidden spells, and then remove THOSE.
-		M.delAbility(M.fetchAbility("Spell_ClanHome"));
-		M.delAbility(M.fetchAbility("Spell_ClanClanWard"));
-		M.delAbility(M.fetchAbility("Spell_ImprovedClanClanWard"));
-		M.delAbility(M.fetchAbility("Spell_ClanDonate"));
-		M.delAbility(M.fetchAbility("Spell_Flagportation"));
+		// Get a list of all possible spell grants for this clan, check against class qualifications.
+		// Form a list of forbidden spells, and then remove THOSE.
+		final Map<String, AbilityMapping> allAbles =  CMLib.ableMapper().getAbleMapping(getGovernment().getName());
+		final Set<String> qualAbleIDS = new TreeSet<String>();
+		for(final Ability A :  getGovernment().getClanLevelAbilities(M, this, Integer.valueOf(getClanLevel())))
+			qualAbleIDS.add(A.ID());
+		for(final String ableID : allAbles.keySet())
+		{
+			final Ability A=M.fetchAbility(ableID);
+			if((A != null)
+			&&(!qualAbleIDS.contains(ableID))
+			&&(!CMLib.ableMapper().qualifiesByLevel(M, ableID)) // this will check ALL clans, as well as other sources.
+			&&(allAbles.get(ableID).autoGain()))
+				M.delAbility(A);
+		}
 
 		final PlayerStats pStats = M.playerStats();
 		if(pStats!=null)
@@ -841,7 +850,7 @@ public class DefaultClan implements Clan
 			if(p != null)
 			{
 				final ClanPosition myPos = govt().findPositionRole(p.second);
-				final String myNicePosName = CMStrings.capitalizeAndLower(myPos.getName());
+				final String myNicePosName = CMStrings.capitalizeAllFirstLettersAndLower(myPos.getName());
 				for(final String baseTitle : govt().getTitleAwards())
 					myAllowedTitles.add(L(baseTitle,name(),myNicePosName));
 				for(final String posTitle : myPos.getTitleAwards())
@@ -859,7 +868,7 @@ public class DefaultClan implements Clan
 			{
 				if((p==null)||(p.second.intValue()!=pos.getRoleID()))
 				{
-					final String nicePosName = CMStrings.capitalizeAndLower(pos.getName());
+					final String nicePosName = CMStrings.capitalizeAllFirstLettersAndLower(pos.getName());
 					for(final String baseTitle : govt().getTitleAwards())
 					{
 						final String badTitle = L(baseTitle,name(),nicePosName);
@@ -1037,7 +1046,7 @@ public class DefaultClan implements Clan
 			}
 			if(topRankedPos != null)
 			{
-				msg.append("^x"+CMStrings.padRight(CMStrings.capitalizeAndLower(topRankedPos.getPluralName()),COLBL_WIDTH)+":^.^N "+crewList(members, topRankedPos.getRoleID())+"\n\r");
+				msg.append("^x"+CMStrings.padRight(CMStrings.capitalizeAllFirstLettersAndLower(topRankedPos.getPluralName()),COLBL_WIDTH)+":^.^N "+crewList(members, topRankedPos.getRoleID())+"\n\r");
 				sortedPositions.add(topRankedPos);
 			}
 		}
@@ -1873,7 +1882,7 @@ public class DefaultClan implements Clan
 		if(!titleCase)
 			return pos.getName().toLowerCase();
 		else
-			return CMStrings.capitalizeAndLower(pos.getName());
+			return CMStrings.capitalizeAllFirstLettersAndLower(pos.getName());
 	}
 
 	protected boolean isSafeFromPurge()
@@ -2317,6 +2326,7 @@ public class DefaultClan implements Clan
 							final ClanPosition oldPos = govt().getPositions()[member.role];
 							final ClanPosition newPos = govt().getPositions()[newRoleI.intValue()];
 
+							final MOB mob=CMLib.players().getPlayerAllHosts(member.name);
 							clanAnnounce(member.name+" is now a "+newPos.getName()+" of the "+getGovernmentName()+" "+name()+".");
 							if(oldPos.getRank() < newPos.getRank())
 								Log.sysOut("Clans",member.name+" of "+getGovernmentName()+" "+name()+" was auto-demoted to "+newPos.getName()+".");
@@ -2325,7 +2335,6 @@ public class DefaultClan implements Clan
 								Log.sysOut("Clans",member.name+" of "+getGovernmentName()+" "+name()+" was auto-promoted to "+newPos.getName()+".");
 							else
 								Log.sysOut("Clans",member.name+" of "+getGovernmentName()+" "+name()+" was auto-assigned to "+newPos.getName()+".");
-							final MOB mob=CMLib.players().getPlayerAllHosts(member.name);
 							if((mob!=null)
 							&&(mob.getClanRole(clanID())!=null))
 								mob.setClan(clanID(),newPos.getRoleID());
@@ -2483,7 +2492,7 @@ public class DefaultClan implements Clan
 					channelSet.add(new Pair<Clan,Integer>(this,Integer.valueOf(getGovernment().getAcceptPos())));
 			}
 		}
-		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.CLANINFO);
+		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.CLANINFO, null);
 		for(int i=0;i<channels.size();i++)
 			CMLib.commands().postChannel(channels.get(i),channelSet,msg,true);
 	}

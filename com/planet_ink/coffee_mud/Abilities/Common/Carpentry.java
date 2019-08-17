@@ -526,7 +526,10 @@ public class Carpentry extends EnhancedCraftingSkill implements ItemCraftor
 			if((componentsFoundList.size() > 0)||(autoGenerate>0))
 				deadMats = new MaterialLibrary.DeadResourceRecord();
 			else
-				deadMats = CMLib.materials().destroyResources(mob.location(),woodRequired,data[0][FOUND_CODE],data[1][FOUND_CODE],null,null);
+			{
+				deadMats = CMLib.materials().destroyResources(mob.location(),woodRequired,
+						data[0][FOUND_CODE],data[0][FOUND_SUB],data[1][FOUND_CODE],data[1][FOUND_SUB]);
+			}
 			final MaterialLibrary.DeadResourceRecord deadComps = CMLib.ableComponents().destroyAbilityComponents(componentsFoundList);
 			final int lostValue=autoGenerate>0?0:(deadMats.lostValue + deadComps.lostValue);
 			buildingI=CMClass.getItem(foundRecipe.get(RCP_CLASSTYPE));
@@ -549,7 +552,7 @@ public class Carpentry extends EnhancedCraftingSkill implements ItemCraftor
 			playSound="sawing.wav";
 			verb=L("carving @x1",buildingI.name());
 			buildingI.setDisplayText(L("@x1 lies here",itemName));
-			buildingI.setDescription(itemName+". ");
+			buildingI.setDescription(determineDescription(itemName, buildingI.material(), deadMats, deadComps));
 			buildingI.basePhyStats().setWeight(getStandardWeight(woodRequired+compData[CF_AMOUNT],data[1][FOUND_CODE], bundling));
 			buildingI.setBaseValue(CMath.s_int(foundRecipe.get(RCP_VALUE)));
 			final int hardness=RawMaterial.CODES.HARDNESS(buildingI.material())-3;
@@ -681,7 +684,7 @@ public class Carpentry extends EnhancedCraftingSkill implements ItemCraftor
 					((Light)buildingI).setDuration(200);
 					if((buildingI.fitsOn(Wearable.WORN_MOUTH))
 					||(((Container)buildingI).containTypes()==Container.CONTAIN_SMOKEABLES))
-						((Container)buildingI).setCapacity(1);
+						((Container)buildingI).setCapacity(((Container)buildingI).basePhyStats().weight()+1);
 					else
 						((Container)buildingI).setCapacity(0);
 				}

@@ -150,7 +150,7 @@ public class Artisan extends StdCharClass
 		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Farming",false,CMParms.parseSemicolons("Foraging(75)",true));
 		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"FoodPreserving",false,CMParms.parseSemicolons("Foraging(75)",true));
 		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Shearing",false,CMParms.parseSemicolons("Foraging(75)",true));
-		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Familiarity_EdgedWeapon",false,CMParms.parseSemicolons("Familiarity_EdgedWeapon(100);Drilling(75)",true));
+		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Familiarity_EdgedWeapon",false,CMParms.parseSemicolons("Proficiency_EdgedWeapon(100);Drilling(75)",true));
 		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Speculate",false,CMParms.parseSemicolons("Foraging(75);Drilling(75);Hunting(75);Fishing(75);Chopping(75);Mining(75);Digging(75)",true));
 		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Sculpting",false,CMParms.parseSemicolons("Mining(75)",true));
 
@@ -272,6 +272,8 @@ public class Artisan extends StdCharClass
 		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Thief_StrategicRetreat",false,CMParms.parseSemicolons("Skill_Autoclimb(75);Skill_Autoswim(75);Skill_Autocrawl(75)",true));
 		CMLib.ableMapper().addCharAbilityMapping(ID(),1,"Skill_ShipLore",false,CMParms.parseSemicolons("Shipwright(75)",true));
 		CMLib.ableMapper().addCharAbilityMapping(ID(),60,"LegendaryWeaponsmithing",false,CMParms.parseSemicolons("MasterWeaponsmithing(100)",true));
+		CMLib.ableMapper().addCharAbilityMapping(ID(),30,"MasterDyeing",false,CMParms.parseSemicolons("Dyeing(100);Herbology(75)",true));
+		CMLib.ableMapper().addCharAbilityMapping(ID(),30,"MasterLacquerring",false,CMParms.parseSemicolons("Lacquerring(100);Herbology(75)",true));
 	}
 
 	@Override
@@ -293,42 +295,44 @@ public class Artisan extends StdCharClass
 	public void executeMsg(final Environmental myHost, final CMMsg msg)
 	{
 		if((msg.source() == myHost)
-		&&(msg.targetMinor() == CMMsg.TYP_ITEMGENERATED)
-		&&(msg.target() != null)
-		&&(msg.tool() instanceof Ability)
-		&&(msg.value() > 0)
-		&&((!(msg.target() instanceof DoorKey))||(msg.tool().ID().equals("LockSmith")))
-		&&(((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_CRAFTINGSKILL)
-			||((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_EPICUREAN)
-			||((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_BUILDINGSKILL)))
+		&&(msg.source().charStats().getCurrentClass() == this))
 		{
-			CMLib.leveler().postExperience(msg.source(),null,null,msg.value(),false);
-		}
-		else
-		if((msg.source() == myHost)
-		&&(msg.targetMinor() == CMMsg.TYP_RECIPELEARNED)
-		&&(msg.target() != null)
-		&&(msg.tool() instanceof Ability)
-		&&((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_CRAFTINGSKILL)
-		&&(msg.value() > 0))
-		{
-			final Map<String,Object> persMap = msg.source().playerStats().getClassVariableMap(this);
-			if(persMap != null)
+			if((msg.targetMinor() == CMMsg.TYP_ITEMGENERATED)
+			&&(msg.target() != null)
+			&&(msg.tool() instanceof Ability)
+			&&(msg.value() > 0)
+			&&((!(msg.target() instanceof DoorKey))||(msg.tool().ID().equals("LockSmith")))
+			&&(((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_CRAFTINGSKILL)
+			 ||((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_EPICUREAN)
+			 ||((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_BUILDINGSKILL)))
 			{
-				final String key = "LAST_DATE_FOR_"+msg.tool().ID().toUpperCase().trim();
-				long[] lastTime = (long[])persMap.get(key);
-				if(lastTime == null)
+				CMLib.leveler().postExperience(msg.source(),null,null,msg.value(),false);
+			}
+			else
+			if((msg.targetMinor() == CMMsg.TYP_RECIPELEARNED)
+			&&(msg.target() != null)
+			&&(msg.tool() instanceof Ability)
+			&&((((Ability)msg.tool()).classificationCode() & Ability.ALL_DOMAINS) == Ability.DOMAIN_CRAFTINGSKILL)
+			&&(msg.value() > 0))
+			{
+				final Map<String,Object> persMap = msg.source().playerStats().getClassVariableMap(this);
+				if(persMap != null)
 				{
-					lastTime = new long[1];
-					persMap.put(key, lastTime);
-				}
-				final Area homeA=CMLib.map().areaLocation(msg.source().getStartRoom());
-				final TimeClock homeL = (homeA == null) ? null : homeA.getTimeObj();
-				if((homeL!=null)
-				&&((homeL.toHoursSinceEpoc() - lastTime[0])>0))
-				{
-					lastTime[0] = homeL.toHoursSinceEpoc();
-					CMLib.leveler().postExperience(msg.source(), null, null, msg.value(), false);
+					final String key = "LAST_DATE_FOR_"+msg.tool().ID().toUpperCase().trim();
+					long[] lastTime = (long[])persMap.get(key);
+					if(lastTime == null)
+					{
+						lastTime = new long[1];
+						persMap.put(key, lastTime);
+					}
+					final Area homeA=CMLib.map().areaLocation(msg.source().getStartRoom());
+					final TimeClock homeL = (homeA == null) ? null : homeA.getTimeObj();
+					if((homeL!=null)
+					&&((homeL.toHoursSinceEpoc() - lastTime[0])>0))
+					{
+						lastTime[0] = homeL.toHoursSinceEpoc();
+						CMLib.leveler().postExperience(msg.source(), null, null, msg.value(), false);
+					}
 				}
 			}
 		}

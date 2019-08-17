@@ -523,6 +523,7 @@ public class StdItem implements Item
 			return (whereCantWear(mob)==0);
 		if((rawProperLocationBitmap()&where)!=where)
 			return false;
+
 		return mob.freeWearPositions(where,(short)0,(short)0)>0;
 	}
 
@@ -1961,6 +1962,7 @@ public class StdItem implements Item
 			return;
 		if(behaviors.remove(to))
 		{
+			to.endBehavior(this);
 			if(((behaviors==null)||(behaviors.isEmpty()))&&((scripts==null)||(scripts.isEmpty())))
 				CMLib.threads().deleteTick(this,Tickable.TICKID_ITEM_BEHAVIOR);
 		}

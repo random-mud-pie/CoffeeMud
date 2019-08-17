@@ -221,6 +221,11 @@ public class Fighter_Whomp extends FighterSkill implements HealthCondition
 				mob.location().send(mob,msg);
 				if(msg.value()<=0)
 					success=maliciousAffect(mob,target,asLevel,2,-1)!=null;
+				else
+				if(CMLib.flags().isStanding(target))
+					return maliciousFizzle(mob,target,L("<T-NAME> shake(s) off the attack and jump(s) to <T-HIS-HER> feet."));
+				else
+					return maliciousFizzle(mob,target,L("<T-NAME> shake(s) off the attack and keep(s) <T-HIS-HER> head about <T-HIM-HER>."));
 			}
 		}
 		else

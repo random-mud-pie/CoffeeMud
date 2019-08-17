@@ -67,7 +67,7 @@ import java.sql.*;
 public class MUD extends Thread implements MudHost
 {
 	private static final float	  HOST_VERSION_MAJOR	= (float)5.9;
-	private static final float	  HOST_VERSION_MINOR	= (float)8.1;
+	private static final float	  HOST_VERSION_MINOR	= (float)8.2;
 
 	private static enum MudState
 	{
@@ -517,8 +517,8 @@ public class MUD extends Thread implements MudHost
 					final long ellapsed=System.currentTimeMillis()-shutdownStateTime.get();
 					if(ellapsed > shutdownTimeout)
 					{
-						if((externalCommand!=null)&&(externalCommand.equalsIgnoreCase("hard")))
-							MUD.execExternalRestart();
+						if(externalCommand!=null)
+							MUD.execExternalRestart(externalCommand);
 						Log.errOut("** Shutdown timeout. **");
 						final StringBuilder lines=new StringBuilder("");
 						lines.append("\n\r^HThread: ^N"+currentShutdownThread.getName()+"\n\r");
@@ -1067,6 +1067,7 @@ public class MUD extends Thread implements MudHost
 					webServerThread.close();
 					Log.sysOut(Thread.currentThread().getName(),"Web server "+webServerThread.getName()+" stopped.");
 					webServers.remove(webServerThread);
+					CMProps.setUpAllLowVar(CMProps.Str.MUDSTATUS,"OK");
 					return true;
 				}
 			}
@@ -1719,6 +1720,7 @@ public class MUD extends Thread implements MudHost
 					room.setArea(newArea);
 					room.setDisplayText(CMLib.lang().L("New Room"));
 					room.setDescription(CMLib.lang().L("Brand new database room! You need to change this text with the MODIFY ROOM command.  If your character is not an Archon, pick up the book you see here and read it immediately!"));
+					CMLib.map().registerWorldObjectLoaded(newArea, null, newArea);
 					CMLib.database().DBCreateRoom(room);
 					final Item I=CMClass.getMiscMagic("ManualArchon");
 					room.addItem(I);
@@ -1732,7 +1734,8 @@ public class MUD extends Thread implements MudHost
 
 			if(clanPostLoads.size()>0)
 			{
-				CMLib.database().DBReadClanItems(clanPostLoads);
+				final int num = CMLib.database().DBReadClanItems(clanPostLoads);
+				Log.sysOut(Thread.currentThread().getName(),"Clan owned items  : "+num);
 			}
 
 			if((tCode==MAIN_HOST)||(checkPrivate&&CMProps.isPrivateToMe("QUESTS")))
@@ -2169,9 +2172,9 @@ public class MUD extends Thread implements MudHost
 			}
 			if(!bringDown)
 			{
-				if((execExternalCommand!=null)&&(execExternalCommand.equalsIgnoreCase("hard")))
+				if(execExternalCommand!=null)
 				{
-					execExternalRestart();
+					execExternalRestart(execExternalCommand);
 					execExternalCommand=null;
 					bringDown=true;
 				}
@@ -2179,21 +2182,35 @@ public class MUD extends Thread implements MudHost
 		}
 	}
 
-	public static void execExternalRestart()
+	public static void execExternalRestart(final String command)
 	{
 		final Runtime r=Runtime.getRuntime();
 		try
 		{
-			if(new File("./restart.sh").exists())
+			if((command==null) || (command.equalsIgnoreCase("hard")))
 			{
-				r.exec("sh restart.sh");
-				Log.sysOut("Attempted to execute 'restart.sh' in "+new File(".").getCanonicalPath());
+				if(new File("./restart.sh").exists())
+				{
+					r.exec("sh restart.sh");
+					Log.sysOut("Attempted to execute 'restart.sh' in "+new File(".").getCanonicalPath());
+				}
+				else
+				if(new File(".\\restart.bat").exists())
+				{
+					r.exec("cmd.exe /c restart.bat");
+					Log.sysOut("Attempted to execute 'restart.bat' in "+new File(".").getCanonicalPath());
+				}
 			}
 			else
-			if(new File(".\\restart.bat").exists())
+			if(System.getProperty("os.name").toLowerCase().indexOf("windows")>=0)
 			{
-				r.exec("cmd.exe /c restart.bat");
-				Log.sysOut("Attempted to execute 'restart.bat' in "+new File(".").getCanonicalPath());
+				r.exec("cmd.exe /c "+command);
+				Log.sysOut("Attempted to execute '"+command+"' in "+new File(".").getCanonicalPath());
+			}
+			else
+			{
+				r.exec("sh "+command);
+				Log.sysOut("Attempted to execute '"+command+"' in "+new File(".").getCanonicalPath());
 			}
 		}
 		catch (final IOException e)

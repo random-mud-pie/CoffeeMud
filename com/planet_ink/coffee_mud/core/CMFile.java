@@ -608,6 +608,11 @@ public class CMFile extends File
 		}
 	}
 
+	public static final void unloadVFS()
+	{
+		Arrays.fill(vfs, null);
+	}
+
 	private static final CMVFSDir vfsV()
 	{
 		return vfs[Thread.currentThread().getThreadGroup().getName().charAt(0)];

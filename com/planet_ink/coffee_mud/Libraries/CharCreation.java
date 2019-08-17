@@ -21,6 +21,7 @@ import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
+import com.planet_ink.coffee_mud.MOBS.interfaces.MOB.Attrib;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
 import com.planet_ink.coffee_web.util.CWThread;
 
@@ -277,7 +278,7 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 	public List<CharClass> classQualifies(final MOB mob, final int theme)
 	{
 		mob.recoverCharStats();
-		final Vector<CharClass> them=new Vector<CharClass>();
+		final Vector<CharClass> them=new Vector<CharClass>(); // return value
 		final HashSet<String> doneClasses=new HashSet<String>();
 		for(final Enumeration<CharClass> c=CMClass.charClasses();c.hasMoreElements();)
 		{
@@ -306,7 +307,7 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 	@Override
 	public List<Race> raceQualifies(final int theme)
 	{
-		final Vector<Race> qualRaces = new Vector<Race>();
+		final Vector<Race> qualRaces = new Vector<Race>(); // return value
 		final HashSet<String> doneRaces=new HashSet<String>();
 		for(final Enumeration<Race> r=CMClass.races();r.hasMoreElements();)
 		{
@@ -1276,6 +1277,8 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 			acct.setFlag(PlayerAccount.AccountFlag.ANSI, false);
 			session.setServerTelnetMode(Session.TELNET_ANSI,false);
 			session.setClientTelnetMode(Session.TELNET_ANSI,false);
+			session.setServerTelnetMode(Session.TELNET_ANSI16,false);
+			session.setClientTelnetMode(Session.TELNET_ANSI16,false);
 		}
 		else
 		if((input.length()>0)&&(!input.startsWith("Y")))
@@ -1599,6 +1602,8 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		final PlayerAccount acct=loginObj.acct;
 		session.setServerTelnetMode(Session.TELNET_ANSI,acct.isSet(PlayerAccount.AccountFlag.ANSI));
 		session.setClientTelnetMode(Session.TELNET_ANSI,acct.isSet(PlayerAccount.AccountFlag.ANSI));
+		session.setServerTelnetMode(Session.TELNET_ANSI16,acct.isSet(PlayerAccount.AccountFlag.ANSI16));
+		session.setClientTelnetMode(Session.TELNET_ANSI16,acct.isSet(PlayerAccount.AccountFlag.ANSI16));
 		// if its not a new account, do this?
 		StringBuffer introText=new CMFile(Resources.buildResourcePath("text")+"selchar.txt",null,CMFile.FLAG_LOGERRORS).text();
 		try
@@ -1855,11 +1860,60 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 			{
 				acct.setFlag(AccountFlag.ANSI, !acct.isSet(AccountFlag.ANSI));
 				if(acct.isSet(AccountFlag.ANSI))
-					session.println(L("ANSI color is now ON."));
+				{
+					if(acct.isSet(AccountFlag.ANSI16))
+						session.println(L("ANSI 16 color is now ON."));
+					else
+						session.println(L("ANSI 256 color is now ON."));
+				}
 				else
 					session.println(L("ANSI color is now OFF."));
 				session.setServerTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
 				session.setClientTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
+			}
+			else
+			if(cmd.equals("ANSI16")||cmd.equals("COLOR16"))
+			{
+				if(acct.isSet(AccountFlag.ANSI))
+				{
+					acct.setFlag(AccountFlag.ANSI16, !acct.isSet(AccountFlag.ANSI16));
+					if(acct.isSet(AccountFlag.ANSI16))
+						session.println(L("ANSI 16 color is now ON."));
+					else
+						session.println(L("ANSI 256 color is now ON."));
+				}
+				else
+				{
+					acct.setFlag(AccountFlag.ANSI, true);
+					acct.setFlag(AccountFlag.ANSI16, true);
+					session.println(L("ANSI 16 color is now ON."));
+				}
+				session.setServerTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
+				session.setClientTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
+				session.setServerTelnetMode(Session.TELNET_ANSI16,acct.isSet(AccountFlag.ANSI16));
+				session.setClientTelnetMode(Session.TELNET_ANSI16,acct.isSet(AccountFlag.ANSI16));
+			}
+			else
+			if(cmd.equals("ANSI256")||cmd.equals("COLOR256"))
+			{
+				if(acct.isSet(AccountFlag.ANSI))
+				{
+					acct.setFlag(AccountFlag.ANSI16, !acct.isSet(AccountFlag.ANSI16));
+					if(acct.isSet(AccountFlag.ANSI16))
+						session.println(L("ANSI 16 color is now ON."));
+					else
+						session.println(L("ANSI 256 color is now ON."));
+				}
+				else
+				{
+					acct.setFlag(AccountFlag.ANSI, true);
+					acct.setFlag(AccountFlag.ANSI16, false);
+					session.println(L("ANSI 256 color is now ON."));
+				}
+				session.setServerTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
+				session.setClientTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
+				session.setServerTelnetMode(Session.TELNET_ANSI16,acct.isSet(AccountFlag.ANSI16));
+				session.setClientTelnetMode(Session.TELNET_ANSI16,acct.isSet(AccountFlag.ANSI16));
 			}
 			else
 			if((parms.length>1)&&(parms[1].equalsIgnoreCase("ON")))
@@ -1869,7 +1923,10 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 				else
 				{
 					acct.setFlag(AccountFlag.ANSI, true);
-					session.println(L("ANSI color is now ON."));
+					if(acct.isSet(AccountFlag.ANSI16))
+						session.println(L("ANSI 16 color is now ON."));
+					else
+						session.println(L("ANSI 256 color is now ON."));
 					session.setServerTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
 					session.setClientTelnetMode(Session.TELNET_ANSI,acct.isSet(AccountFlag.ANSI));
 				}
@@ -2451,6 +2508,8 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 				mob.setAttribute(MOB.Attrib.ANSI,false);
 				session.setServerTelnetMode(Session.TELNET_ANSI,false);
 				session.setClientTelnetMode(Session.TELNET_ANSI,false);
+				session.setServerTelnetMode(Session.TELNET_ANSI16,false);
+				session.setClientTelnetMode(Session.TELNET_ANSI16,false);
 			}
 			loginObj.state=LoginState.CHARCR_ANSIDONE;
 		}
@@ -2471,17 +2530,24 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		if(input.startsWith("N"))
 		{
 			mob.setAttribute(MOB.Attrib.ANSI,false);
+			mob.setAttribute(MOB.Attrib.ANSI16,false);
 			session.setServerTelnetMode(Session.TELNET_ANSI,false);
 			session.setClientTelnetMode(Session.TELNET_ANSI,false);
+			session.setServerTelnetMode(Session.TELNET_ANSI16,false);
+			session.setClientTelnetMode(Session.TELNET_ANSI16,false);
 		}
 		else
-		if((input.length()>0)&&(!input.startsWith("Y")))
+		if((input.length()>0)
+		&&(!input.startsWith("Y")))
 		{
 			session.promptPrint(L(RECONFIRMSTR));
 			return LoginResult.INPUT_REQUIRED;
 		}
 		else
+		{
 			mob.setAttribute(MOB.Attrib.ANSI,true);
+			mob.setAttribute(MOB.Attrib.ANSI16,false);
+		}
 		loginObj.state=LoginState.CHARCR_ANSIDONE;
 		return null;
 	}
@@ -3170,8 +3236,26 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		else
 		if((qualClassesV.size()==1)||(session==null)||(session.isStopped()))
 		{
-			mob.baseCharStats().setCurrentClass(qualClassesV.get(0));
-			mob.charStats().setCurrentClass(qualClassesV.get(0));
+			CharClass newClass = null;
+			if(qualClassesV.size()>1)
+			{
+				for(final Iterator<CharClass> c=qualClassesV.iterator();c.hasNext();)
+				{
+					final CharClass C=c.next();
+					if(C.getSubClassRule()==CharClass.SubClassRule.ANY)
+					{
+						newClass=C;
+						break;
+					}
+				}
+				if((newClass == null)
+				&&(qualClassesV.contains(CMClass.getCharClass("Apprentice"))))
+					newClass = CMClass.getCharClass("Apprentice");
+			}
+			if(newClass == null)
+				newClass = qualClassesV.get(0);
+			mob.baseCharStats().setCurrentClass(newClass);
+			mob.charStats().setCurrentClass(newClass);
 			loginObj.state=LoginState.CHARCR_CLASSDONE;
 			return null;
 		}
@@ -3483,7 +3567,7 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		&&(mob.isAttributeSet(MOB.Attrib.PLAYERKILL)))
 			mob.setAttribute(MOB.Attrib.PLAYERKILL,false);
 		CMLib.database().DBUpdatePlayer(mob);
-		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.NEWPLAYERS);
+		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.NEWPLAYERS, mob);
 		for(int i=0;i<channels.size();i++)
 			CMLib.commands().postChannel(channels.get(i),mob.clans(),L("@x1 has just been created.",mob.Name()),true);
 		CMLib.coffeeTables().bump(mob,CoffeeTableRow.STAT_NEWPLAYERS);
@@ -3819,14 +3903,15 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		}
 		if(mob.playerStats()!=null)
 			mob.playerStats().setLastIP(session.getAddress());
-		notifyFriends(mob,L("^X@x1 has logged on.^.^?",mob.Name()));
+		if(!mob.isAttributeSet(Attrib.PRIVACY))
+			notifyFriends(mob,L("^X@x1 has logged on.^.^?",mob.Name()));
 		if((CMProps.getVar(CMProps.Str.PKILL).startsWith("ALWAYS"))
 		&&(!mob.isAttributeSet(MOB.Attrib.PLAYERKILL)))
 			mob.setAttribute(MOB.Attrib.PLAYERKILL,true);
 		if((CMProps.getVar(CMProps.Str.PKILL).startsWith("NEVER"))
 		&&(mob.isAttributeSet(MOB.Attrib.PLAYERKILL)))
 			mob.setAttribute(MOB.Attrib.PLAYERKILL,false);
-		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LOGINS);
+		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LOGINS, mob);
 		if(!CMLib.flags().isCloaked(mob))
 		{
 			for(int i=0;i<channels.size();i++)
@@ -3835,6 +3920,8 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		for(final Pair<Clan,Integer> clan : mob.clans())
 			clan.first.updateClanPrivileges(mob);
 		setGlobalBitmaps(mob);
+		if(mob.location()!=null)
+			CMLib.players().changePlayersLocation(mob, mob.location());
 		return LoginResult.NORMAL_LOGIN;
 	}
 
@@ -3963,9 +4050,9 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		}
 
 		if((roomID==null)||(roomID.length()==0))
-			roomID=startRooms.get(race);
-		if((roomID==null)||(roomID.length()==0))
 			roomID=startRooms.get(realrace);
+		if((roomID==null)||(roomID.length()==0))
+			roomID=startRooms.get(race);
 		if(((roomID==null)||(roomID.length()==0)))
 			roomID=startRooms.get(align);
 		if(((roomID==null)||(roomID.length()==0)))
@@ -4008,6 +4095,8 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		charClass=charClass.replace(' ','_');
 		String race=mob.baseCharStats().getMyRace().racialCategory().toUpperCase();
 		race=race.replace(' ','_');
+		String realrace=mob.baseCharStats().getMyRace().ID().toUpperCase();
+		realrace=realrace.replace(' ','_');
 		String deity=mob.getWorshipCharID().toUpperCase();
 		deity=deity.replace(' ','_');
 		final String align=CMLib.flags().getAlignmentName(mob);
@@ -4026,6 +4115,8 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 			}
 		}
 
+		if(((roomID==null)||(roomID.length()==0)))
+			roomID=deathRooms.get(realrace);
 		if(((roomID==null)||(roomID.length()==0)))
 			roomID=deathRooms.get(race);
 		if(((roomID==null)||(roomID.length()==0)))
@@ -4107,9 +4198,9 @@ public class CharCreation extends StdLibrary implements CharCreationLibrary
 		}
 
 		if((roomID==null)||(roomID.length()==0))
-			roomID=bodyRooms.get(race);
-		if((roomID==null)||(roomID.length()==0))
 			roomID=bodyRooms.get(realrace);
+		if((roomID==null)||(roomID.length()==0))
+			roomID=bodyRooms.get(race);
 		if(((roomID==null)||(roomID.length()==0)))
 			roomID=bodyRooms.get(align);
 		if(((roomID==null)||(roomID.length()==0)))

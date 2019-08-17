@@ -47,7 +47,7 @@ public class Unload extends StdCommand
 		return access;
 	}
 
-	final String[]	ARCHON_LIST	= { "CLASS", "HELP", "USER", "AREA", "FACTION", "ALL", "FILE", "RESOURCE", "INIFILE", "ACHIEVEMENTS", "[FILENAME]" };
+	final String[]	ARCHON_LIST	= { "CLASS", "HELP", "USER", "AREA", "FACTION", "ALL", "FILE", "RESOURCE", "INIFILE", "ACHIEVEMENTS", "[FILENAME]", "VFS" };
 
 	@Override
 	public boolean execute(final MOB mob, final List<String> commands, final int metaFlags)
@@ -236,6 +236,12 @@ public class Unload extends StdCommand
 				mob.tell(L("No access to help."));
 			}
 			else
+			if(str.equalsIgnoreCase("vfs"))
+			{
+				CMFile.unloadVFS();
+				mob.tell(L("VFS Cache unloaded"));
+			}
+			else
 			if(str.equalsIgnoreCase("achievements"))
 			{
 				CMLib.achievements().shutdown();
@@ -265,7 +271,7 @@ public class Unload extends StdCommand
 			&&(mob.session()!=null))
 			{
 				final String which=CMParms.combine(commands,2);
-				final Vector<MOB> users=new Vector<MOB>();
+				final List<MOB> users=new ArrayList<MOB>();
 				if((which.equalsIgnoreCase("all"))
 				&&(CMSecurity.isAllowed(mob,mob.location(),CMSecurity.SecFlag.CMDPLAYERS)))
 				{

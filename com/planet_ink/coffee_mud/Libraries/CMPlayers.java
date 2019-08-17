@@ -738,11 +738,22 @@ public class CMPlayers extends StdLibrary implements PlayerLibrary
 				A.delPlayer(deadMOB);
 		}
 		final Room deadLoc=deadMOB.location();
+		final CMMsg msg=CMClass.getMsg(deadMOB,null,CMMsg.MSG_RETIRE,(quiet)?null:L("A horrible death cry is heard throughout the land."));
 		if(deleteAssets)
 		{
-			final CMMsg msg=CMClass.getMsg(deadMOB,null,CMMsg.MSG_RETIRE,(quiet)?null:L("A horrible death cry is heard throughout the land."));
 			if(deadLoc!=null)
 				deadLoc.send(deadMOB,msg);
+
+		}
+		final Session session = deadMOB.session();
+		if((session!=null)&&(!session.isStopped()))
+		{
+			session.logout(true);
+			if(session!=null)
+				session.stopSession(false,false,false);
+		}
+		if(deleteAssets)
+		{
 			try
 			{
 				for(final Enumeration<Room> r=CMLib.map().rooms();r.hasMoreElements();)
@@ -755,6 +766,7 @@ public class CMPlayers extends StdLibrary implements PlayerLibrary
 						else
 						{
 							addPlayer(deadMOB);
+							// your session is still gone, but at least you are not
 							return;
 						}
 					}
@@ -784,7 +796,7 @@ public class CMPlayers extends StdLibrary implements PlayerLibrary
 		final PlayerStats pStats = deadMOB.playerStats();
 		if(pStats != null)
 			pStats.getExtItems().delAllItems(true);
-		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.PLAYERPURGES);
+		final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.PLAYERPURGES, deadMOB);
 		if(channels.size()>0)
 		{
 			String name=deadMOB.Name();
@@ -848,8 +860,6 @@ public class CMPlayers extends StdLibrary implements PlayerLibrary
 			}
 		}
 
-		if(deadMOB.session()!=null)
-			deadMOB.session().stopSession(false,false,false);
 		Log.sysOut(deadMOB.name()+" has been deleted.");
 		deadMOB.destroy();
 	}
@@ -1543,6 +1553,36 @@ public class CMPlayers extends StdLibrary implements PlayerLibrary
 		return true;
 	}
 
+	protected void saveLastMonthsTopsData()
+	{
+		final Command C=CMClass.getCommand("Top");
+		if(C!=null)
+		{
+			final Calendar calC=Calendar.getInstance();
+			final String dir="::/resources/sys_reports/";
+			final CMFile dirF=new CMFile(dir, null);
+			if(!dirF.exists())
+				dirF.mkdir();
+			final String filename = "::/resources/sys_reports/"+name()+"_top_report_"+calC.get(Calendar.YEAR)+"-"+(calC.get(Calendar.MONTH)+1)+"-"+calC.get(Calendar.DAY_OF_MONTH)+".txt";
+			final CMFile F=new CMFile(filename, null);
+			if(!F.exists())
+			{
+				final MOB mob=CMLib.map().deity();
+				Object o;
+				try
+				{
+					o = C.executeInternal(mob, 0, new Object[0]);
+					if(o instanceof String)
+						F.saveText(o);
+				}
+				catch (final IOException e)
+				{
+					Log.errOut(e);
+				}
+			}
+		}
+	}
+
 	@Override
 	public boolean tick(final Tickable ticking, final int tickID)
 	{
@@ -1590,6 +1630,8 @@ public class CMPlayers extends StdLibrary implements PlayerLibrary
 							continue;
 						if(now > topPrideExpiration[period.ordinal()])
 						{
+							if(period == TimeClock.TimePeriod.MONTH)
+								saveLastMonthsTopsData();
 							topPrideExpiration[period.ordinal()] = period.nextPeriod();
 							for(final AccountStats.PrideStat stat : AccountStats.PrideStat.values())
 							{

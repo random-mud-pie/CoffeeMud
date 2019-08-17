@@ -114,7 +114,6 @@ public class Digging extends GatheringSkill
 				else
 				{
 					final StringBuffer str=new StringBuffer(L("You can't seem to find anything worth digging up here.\n\r"));
-					commonTell(mob,str.toString());
 					int d=lookingForMat(RawMaterial.MATERIAL_PRECIOUS,mob.location());
 					if(d<0) d=lookingForMat(RawMaterial.MATERIAL_GLASS,mob.location());
 					if(d<0) d=lookingForRsc(RawMaterial.RESOURCE_SAND,mob.location());
@@ -148,6 +147,7 @@ public class Digging extends GatheringSkill
 					if((found.material()&RawMaterial.MATERIAL_MASK)!=RawMaterial.MATERIAL_PRECIOUS)
 						amount=CMLib.dice().roll(1,15,0);
 					amount=amount*(baseYield()+abilityCode());
+					amount=super.adjustYieldBasedOnRoomSpam(amount, mob.location());
 					final CMMsg msg=CMClass.getMsg(mob,found,this,getCompletedActivityMessageType(),null);
 					msg.setValue(amount);
 					if(mob.location().okMessage(mob, msg))
@@ -203,6 +203,7 @@ public class Digging extends GatheringSkill
 			return false;
 		final int resourceType=mob.location().myResource();
 		if((proficiencyCheck(mob,0,auto))
+		   &&(super.checkIfAnyYield(mob.location()))
 		   &&(((resourceType&RawMaterial.MATERIAL_MASK)==RawMaterial.MATERIAL_PRECIOUS)
 		   ||((resourceType&RawMaterial.MATERIAL_MASK)==RawMaterial.MATERIAL_GLASS)
 		   ||(resourceType==RawMaterial.RESOURCE_SAND)

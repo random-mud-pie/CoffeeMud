@@ -1,10 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html><head>
 <meta name="generator" content="HTML Tidy, see www.w3.org">
-<meta name="GENERATOR" content="Microsoft Visual Studio 6.0"><title></title>
-
-</head>
-
+<meta name="GENERATOR" content="Microsoft Visual Studio 6.0"><title></title></head>
 <body style="background-color: rgb(255, 255, 255); color: rgb(0, 0, 0);" alink="#0000ee" link="#0000ee" vlink="#551a8b">
 <a href="#appd"><img src="images/paperclip.jpg" alt="Index" align="left" height="35" width="27"></a>
 <p style="text-align: center;" align="center"><strong><span style="font-size: 18pt;"><font size="6">The
@@ -755,7 +752,9 @@ Ships can be initially docked here.</td>
 <td>ShallowWater</td>
 <td>a wet, outdoor area</td>
 </tr>
-<tr>
+<tr><td>ShipDeck</td><td>for prototyping Sailing Ships, a wooden deck with limited capacity</td></tr><tr><td>ShipHold</td><td>for prototyping&nbsp;Sailing Ships, a wooden room with high, but limited capacity</td></tr><tr><td>ShipMagazine</td><td>for prototyping Sailing Ships, a wooden room with med, but limited capacity</td></tr><tr><td>ShipLightGunDeck<br>ShipMedGunDeck<br>ShipHeavyGunDeck</td><td>for
+prototyping Sailing ships, a wooden deck with low capacity, but which
+allows an increasing number of siege engines at around 200 pounds each.</td></tr><tr><td>ShipQuarter</td><td>for prototyping Sailing Ships, a wooden room with low limited capacity</td></tr><tr>
 <td>Shore</td>
 <td>some solid ground to
 fish from, if water is nearby</td>
@@ -2450,9 +2449,10 @@ time the item rejuvenates. For more information on making the
 RejuvTicks property take effect after changing it, see below under
 Rejuvenating Items and Mobs" or "How to Save a Room".<br>
 If this item is located in a mobs inventory, this value represents the
-% chance of it appearing in the mobs inventory after reset. In this
-case, the value should be between 1-100, or 0 to also represent 100
-(always available), or -1 to make an item only appear at boot time. See
+% chance of it NOT appearing in the mobs inventory after reset. In this
+case, the value should be between 1-100, or 0 to also
+represent&nbsp;always available, or -1 to make an item only appear at
+boot time. See
 the section on "Equipping Mobs" for more
 information on this feature.</p>
 </td>
@@ -4235,6 +4235,7 @@ Here are some important effects you may consider for your items:</p>
 "Prop_ItemTransporter" makes an item that transports things.<br>
 "Prop_ItemTransReceiver" makes an item receives transported things.<br>
 "Prop_LangTranslator" makes the item a translator of languages.<br>
+"Prop_LimitedEquip" can limit the number of particular items that can be equipped.<br>
 "Prop_LimitedItems" can limit the number of a particular item ever to
 be owned.<br>
 "Prop_LocationBound" limits where an item can be taken from.<br>
@@ -4871,6 +4872,7 @@ for each item they list for auction.</td>
 <td><em>Listing
 Cut/%Pct per day</em></td>
 <td>This field allows the
+
 auctioneer to take a cut for
 high-price listings. This is the percentage of the listed items BASE
 price PER day of the auction that is charged at the time the auction is
@@ -4945,7 +4947,7 @@ Interest</em></td>
 <td>This is the amount of
 interest paid (or CHARGED if negative)
 every game month (about once a real day) on items left in a users
-account.</td>
+account.<br>The ability to hold items can be disabled by making this amount &gt; 0.5</td>
 </tr>
 <tr>
 <td><em>Loan
@@ -4953,7 +4955,7 @@ Interest</em></td>
 <td>This is the amount of
 interest charged every game month
 (about once a real day) on gold money loaned to players or clans
-account.</td>
+account.<br>The ability to make loans can be disabled by making this amount &lt; -0.5</td>
 </tr>
 <tr>
 <td><em>Bank
@@ -6080,7 +6082,7 @@ alternative reset method however. If you were to make NONE of your mobs
 or items resettable under the current scheme (by making the REJUV value
 0), then to add the Behavior called "ResetWhole" to each Area, you can
 simply reset every room in the area on a timed basis. The behavior will
-reset every room after noone has visited the area in a certain amount
+reset every room after no one has visited the area in a certain amount
 of time. This time can be set in the behaviors parameters. Use AHELP
 ResetWhole for more information on this behavior.</p>
 <p><strong><a name="appa"><font color="green" size="5">Appendix A:

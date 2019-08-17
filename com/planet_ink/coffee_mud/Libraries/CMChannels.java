@@ -20,6 +20,7 @@ import com.planet_ink.coffee_mud.Libraries.interfaces.ChannelsLibrary.ChannelMsg
 import com.planet_ink.coffee_mud.Libraries.interfaces.ColorLibrary.Color;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
+import com.planet_ink.coffee_mud.MOBS.interfaces.MOB.Attrib;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
 
 import java.lang.reflect.Method;
@@ -416,13 +417,23 @@ public class CMChannels extends StdLibrary implements ChannelsLibrary
 	}
 
 	@Override
-	public List<String> getFlaggedChannelNames(final ChannelFlag flag)
+	public List<String> getFlaggedChannelNames(final ChannelFlag flag, MOB mob)
 	{
 		final List<String> channels=new Vector<String>();
 		for(int c=0;c<channelList.size();c++)
 		{
-			if(channelList.get(c).flags().contains(flag))
-				channels.add(channelList.get(c).name().toUpperCase());
+			final CMChannel chan=channelList.get(c);
+			if((chan!=null)
+			&&(chan.flags().contains(flag)))
+			{
+				if((mob==null)
+				||(!mob.isAttributeSet(Attrib.PRIVACY)))
+					channels.add(chan.name().toUpperCase());
+				else
+				if(!CMLib.masking().maskCheck(chan.mask(),mob,true))
+					channels.add(chan.name().toUpperCase());
+				
+			}
 		}
 		return channels;
 	}
@@ -735,6 +746,32 @@ public class CMChannels extends StdLibrary implements ChannelsLibrary
 		if(chan.flags().contains(ChannelsLibrary.ChannelFlag.ADDAREA)
 		&&(R!=null)&&(R.getArea()!=null))
 			nameAppendage+=" at "+CMStrings.replaceAll(R.getArea().name(mob),"\'","");
+
+		if((mob!=null)
+		&&(mob.isPlayer())
+		&&(!systemMsg)
+		&&(((CMProps.getIntVar(CMProps.Int.RP_CHANNEL)!=0)||(CMProps.getIntVar(CMProps.Int.RP_CHANNEL_NAMED)!=0))))
+		{
+			if(System.currentTimeMillis() >= pStats.getLastRolePlayXPTime() + CMProps.getIntVar(CMProps.Int.RP_AWARD_DELAY))
+			{
+				if(CMProps.isSpecialRPChannel(channelName))
+				{
+					if(CMProps.getIntVar(CMProps.Int.RP_CHANNEL_NAMED)!=0)
+					{
+						pStats.setLastRolePlayXPTime(System.currentTimeMillis());
+						CMLib.leveler().postRPExperience(mob, null, "", CMProps.getIntVar(CMProps.Int.RP_CHANNEL_NAMED), false);
+					}
+				}
+				else
+				{
+					if(CMProps.getIntVar(CMProps.Int.RP_CHANNEL)!=0)
+					{
+						pStats.setLastRolePlayXPTime(System.currentTimeMillis());
+						CMLib.leveler().postRPExperience(mob, null, "", CMProps.getIntVar(CMProps.Int.RP_CHANNEL), false);
+					}
+				}
+			}
+		}
 
 		CMMsg msg=null;
 		if(systemMsg)

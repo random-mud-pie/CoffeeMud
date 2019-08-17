@@ -85,7 +85,8 @@ public class MOTD extends StdCommand
 		}
 		final String parm=CMParms.combine(commands,1).toUpperCase();
 		oldOk = "PREVIOUS".startsWith(parm) || parm.equals("OLD");
-		if((mob.playerStats()!=null)
+		final PlayerStats pStats = mob.playerStats();
+		if((pStats!=null)
 		&&(parm.equals("AGAIN")||parm.equals("NEW")||oldOk))
 		{
 			final StringBuffer buf=new StringBuffer("");
@@ -116,7 +117,7 @@ public class MOTD extends StdCommand
 					final String subject=entry.subj();
 					String message=entry.msg();
 					final long compdate=entry.update();
-					if((compdate>mob.playerStats().getLastDateTime())||(oldOk))
+					if((compdate>pStats.getLastDateTime())||(oldOk))
 					{
 						boolean allMine=to.equalsIgnoreCase(mob.Name())
 										||from.equalsIgnoreCase(mob.Name());
@@ -167,7 +168,7 @@ public class MOTD extends StdCommand
 				if((postalChains.size()>0)&&(P!=null))
 				{
 					List<PlayerData> V=CMLib.database().DBReadPlayerData(mob.Name(),postalChains);
-					final Map<PostOffice,int[]> res=getPostalResults(V,mob.playerStats().getLastDateTime());
+					final Map<PostOffice,int[]> res=getPostalResults(V,pStats.getLastDateTime());
 					for(final Iterator<PostOffice> e=res.keySet().iterator();e.hasNext();)
 					{
 						P=e.next();
@@ -185,7 +186,7 @@ public class MOTD extends StdCommand
 								V=CMLib.database().DBReadPlayerData(C.name(),postalChains);
 								if(V.size()>0)
 								{
-									res2.putAll(getPostalResults(V,mob.playerStats().getLastDateTime()));
+									res2.putAll(getPostalResults(V,pStats.getLastDateTime()));
 								}
 							}
 							for(final Iterator<PostOffice> e=res2.keySet().iterator();e.hasNext();)
@@ -213,7 +214,7 @@ public class MOTD extends StdCommand
 				for(int cj=0;cj<myEchoableCommandJournals.size();cj++)
 				{
 					final JournalsLibrary.CommandJournal CMJ=myEchoableCommandJournals.get(cj);
-					final List<JournalEntry> items=CMLib.database().DBReadJournalMsgsNewerThan("SYSTEM_"+CMJ.NAME()+"S", "ALL", mob.playerStats().getLastDateTime());
+					final List<JournalEntry> items=CMLib.database().DBReadJournalMsgsNewerThan("SYSTEM_"+CMJ.NAME()+"S", "ALL", pStats.getLastDateTime());
 					if(items!=null)
 					{
 						for(int i=0;i<items.size();i++)
@@ -230,11 +231,10 @@ public class MOTD extends StdCommand
 					buf.append("\n\r--------------------------------------\n\r");
 
 				final boolean canReceiveRealEmail =
-						(mob.playerStats()!=null)
-					  &&(mob.playerStats().getEmail().length()>0)
+						(pStats.getEmail().length()>0)
 					  &&(mob.isAttributeSet(MOB.Attrib.AUTOFORWARD))
-					  &&((mob.playerStats().getAccount()==null)
-						||(!mob.playerStats().getAccount().isSet(AccountFlag.NOAUTOFORWARD)));
+					  &&((pStats.getAccount()==null)
+						||(!pStats.getAccount().isSet(AccountFlag.NOAUTOFORWARD)));
 
 				if(canReceiveRealEmail
 				&&(CMProps.getVar(CMProps.Str.MAILBOX).length()>0))
@@ -267,25 +267,26 @@ public class MOTD extends StdCommand
 				}
 
 				final List<Quest> qQVec=CMLib.quests().getPlayerPersistentQuests(mob);
-				if(mob.session()!=null)
+				final Session session = mob.session();
+				if(session!=null)
 				{
 					if(buf.length()>0)
 					{
 						if(qQVec.size()>0)
 							buf.append(L("\n\r^HYou are on @x1 quest(s).  Enter QUESTS to see them!.^?^.\n\r",""+qQVec.size()));
-						mob.session().wraplessPrintln("\n\r--------------------------------------\n\r"+buf.toString());
+						session.wraplessPrintln("\n\r--------------------------------------\n\r"+buf.toString());
 						if (pause)
 						{
-							mob.session().prompt(L("\n\rPress ENTER: "), 10000);
-							mob.session().println("\n\r");
+							session.prompt(L("\n\rPress ENTER: "), 10000);
+							session.println("\n\r");
 						}
 					}
 					else
 					if(qQVec.size()>0)
-						buf.append(L("\n\r^HYou are on @x1 quest(s).  Enter QUESTS to see them!.^?^.\n\r",""+qQVec.size()));
+						session.println(L("\n\r^HYou are on @x1 quest(s).  Enter QUESTS to see them!.^?^.\n\r",""+qQVec.size()));
 					else
 					if(parm.equals("AGAIN"))
-						mob.session().println(L("No @x1 to re-read.",what));
+						session.println(L("No @x1 to re-read.",what));
 
 					// check for new commandjournal postings that require a reply-to-self...
 					for(final Enumeration<JournalsLibrary.CommandJournal> e=CMLib.journals().commandJournals();e.hasMoreElements();)
@@ -296,7 +297,6 @@ public class MOTD extends StdCommand
 						final List<JournalEntry> items=CMLib.database().DBReadJournalMsgsNewerThan(CMJ.JOURNAL_NAME(), mob.Name(), -1);
 						if((items!=null)&&(items.size()>0))
 						{
-							final Session session=mob.session();
 							if(session.confirm(L("You have messages waiting response in @x1. Read now (y/N)? ", CMJ.NAME()),"N",5000))
 							{
 								int count=1;
@@ -319,6 +319,55 @@ public class MOTD extends StdCommand
 									if(msg2.value()>0)
 										count++;
 								}
+							}
+						}
+					}
+					if((pStats.getSubscriptions().size()>0))
+					{
+						for(String sub : pStats.getSubscriptions())
+						{
+							if(!sub.startsWith(" P :"))
+								continue;
+							sub=sub.substring(4).trim();
+							final List<JournalEntry> items=CMLib.database().DBReadJournalMsgsNewerThan(sub, null, pStats.getLastDateTime());
+							int newPosts = 0;
+							int newReplies=0;
+							final Map<String,JournalEntry> newEntries = new HashMap<String,JournalEntry>();
+							for(final JournalEntry J : items)
+								newEntries.put(J.key(), J);
+							for(final JournalEntry J : items)
+							{
+								if((J.to().equalsIgnoreCase(mob.Name())||J.to().equalsIgnoreCase("ALL"))
+								&&(!J.from().equalsIgnoreCase(mob.Name())))
+								{
+									if((J.parent()==null)
+									||(J.parent().length()==0))
+										newPosts++;
+									else
+									{
+										if(!newEntries.containsKey(J.parent()))
+										{
+											final JournalEntry E=CMLib.database().DBReadJournalEntry(sub, J.parent());
+											if(E!=null)
+												newEntries.put(E.key(), E);
+										}
+										final JournalEntry E=newEntries.get(J.parent());
+										if((E!=null)&&(E.from().equalsIgnoreCase(mob.Name())))
+											newReplies++;
+									}
+								}
+							}
+							if((session!=null)
+							&&(!session.isStopped()))
+							{
+								if((newPosts > 0) && (newReplies > 0))
+									session.println(L("The journal @x1 has @x2 new entries and @x3 replies for you.",sub,""+newPosts,""+newReplies));
+								else
+								if(newPosts > 0)
+									session.println(L("The journal @x1 has @x2 new entries.",sub,""+newPosts));
+								else
+								if(newReplies > 0)
+									session.println(L("The journal @x1 has @x2 new replies for you.",sub,""+newReplies));
 							}
 						}
 					}

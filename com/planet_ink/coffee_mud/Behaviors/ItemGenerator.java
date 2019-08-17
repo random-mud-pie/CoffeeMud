@@ -244,6 +244,7 @@ public class ItemGenerator extends ActiveTicker
 			List<Item> allItems=(List<Item>)Resources.getResource("ITEMGENERATOR-ALLITEMS");
 			if(allItems!=null)
 				return false;
+			Log.sysOut(ID(),"Starting master item generation");
 			allItems=new Vector<Item>();
 
 			final List<ItemCraftor> skills=new Vector<ItemCraftor>();
@@ -265,6 +266,7 @@ public class ItemGenerator extends ActiveTicker
 						return false;
 				}
 			}
+			Log.sysOut(ID(),"Finished master item generation");
 			Resources.submitResource("ITEMGENERATOR-ALLITEMS",allItems);
 			return false;
 		}
@@ -473,16 +475,16 @@ public class ItemGenerator extends ActiveTicker
 					{
 						if(CMLib.flags().isGettable(I)&&(!(I instanceof Rideable)))
 						{
-							final Vector<MOB> inhabs=new Vector<MOB>();
+							final List<MOB> inhabs=new ArrayList<MOB>();
 							for(int m=0;m<room.numInhabitants();m++)
 							{
 								final MOB M=room.fetchInhabitant(m);
 								if((M.isSavable())&&(M.getStartRoom().getArea().inMyMetroArea(room.getArea())))
-									inhabs.addElement(M);
+									inhabs.add(M);
 							}
 							if(inhabs.size()>0)
 							{
-								final MOB M=inhabs.elementAt(CMLib.dice().roll(1,inhabs.size(),-1));
+								final MOB M=inhabs.get(CMLib.dice().roll(1,inhabs.size(),-1));
 								M.addItem(CMLib.itemBuilder().enchant(I,enchantPct));
 								I.wearIfPossible(M);
 								maintained.addElement(I);

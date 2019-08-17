@@ -403,24 +403,12 @@ public class StdExit implements Exit
 
 	protected final String closeWordPastTense()
 	{
-		if(closeWord().length()==0)
-			return "closed";
-		else
-		if(CMStrings.isVowel(closeWord().charAt(closeWord().length()-1)))
-			return closeWord()+"d";
-		else
-			return closeWord()+"ed";
+		return CMLib.english().makePastTense(closeWord(), "closed");
 	}
 
 	protected final String openWordPastTense()
 	{
-		if(openWord().length()==0)
-			return "opened";
-		else
-		if(CMStrings.isVowel(openWord().charAt(openWord().length()-1)))
-			return openWord()+"d";
-		else
-			return openWord()+"ed";
+		return CMLib.english().makePastTense(openWord(), "opened");
 	}
 
 	@Override
@@ -1095,7 +1083,8 @@ public class StdExit implements Exit
 	{
 		if(behaviors==null)
 			return;
-		behaviors.remove(to);
+		if(behaviors.remove(to))
+			to.endBehavior(this);
 		if(((behaviors==null)||(behaviors.size()==0))&&((scripts==null)||(scripts.size()==0)))
 			CMLib.threads().deleteTick(this,Tickable.TICKID_EXIT_BEHAVIOR);
 	}

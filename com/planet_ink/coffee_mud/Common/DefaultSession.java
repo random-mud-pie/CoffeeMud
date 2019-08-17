@@ -12,6 +12,7 @@ import com.planet_ink.coffee_mud.Behaviors.interfaces.*;
 import com.planet_ink.coffee_mud.CharClasses.interfaces.*;
 import com.planet_ink.coffee_mud.Commands.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.*;
+import com.planet_ink.coffee_mud.Common.interfaces.Session.SessionFilter;
 import com.planet_ink.coffee_mud.Common.interfaces.Session.SessionStatus;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
@@ -21,6 +22,7 @@ import com.planet_ink.coffee_mud.Libraries.interfaces.CharCreationLibrary.LoginS
 import com.planet_ink.coffee_mud.Libraries.interfaces.ColorLibrary.ColorState;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
+import com.planet_ink.coffee_mud.MOBS.interfaces.MOB.Attrib;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
 import com.jcraft.jzlib.*;
 
@@ -141,7 +143,8 @@ public class DefaultSession implements Session
 	protected boolean		 debugBinInput		 = false;
 	protected StringBuffer   debugBinInputBuf	 = new StringBuffer("");
 
-	protected volatile InputCallback inputCallback  = null;
+	protected List<SessionFilter>		textFilters		= new Vector<SessionFilter>(3);
+	protected volatile InputCallback	inputCallback	= null;
 
 	@Override
 	public String ID()
@@ -344,6 +347,8 @@ public class DefaultSession implements Session
 
 			setServerTelnetMode(TELNET_ANSI,true);
 			setClientTelnetMode(TELNET_ANSI,true);
+			setServerTelnetMode(TELNET_ANSI16,false);
+			setClientTelnetMode(TELNET_ANSI16,false);
 			setClientTelnetMode(TELNET_TERMTYPE,true);
 			changeTelnetMode(rawout,TELNET_TERMTYPE,true);
 			negotiateTelnetMode(rawout,TELNET_TERMTYPE);
@@ -771,6 +776,8 @@ public class DefaultSession implements Session
 	{
 		setServerTelnetMode(TELNET_ANSI,CMath.bset(attributesBitmap,MOB.Attrib.ANSI.getBitCode()));
 		setClientTelnetMode(TELNET_ANSI,CMath.bset(attributesBitmap,MOB.Attrib.ANSI.getBitCode()));
+		setServerTelnetMode(TELNET_ANSI16,CMath.bset(attributesBitmap,MOB.Attrib.ANSI16.getBitCode()));
+		setClientTelnetMode(TELNET_ANSI16,CMath.bset(attributesBitmap,MOB.Attrib.ANSI16.getBitCode()));
 		boolean changedSomething=false;
 		final boolean mxpSet=(!CMSecurity.isDisabled(CMSecurity.DisFlag.MXP))&&CMath.bset(attributesBitmap,MOB.Attrib.MXP.getBitCode());
 		if(mxpSet!=getClientTelnetMode(TELNET_MXP))
@@ -1319,7 +1326,7 @@ public class DefaultSession implements Session
 	@Override
 	public void print(final String msg)
 	{
-		onlyPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,mob,mob,null,msg,false),false);
+		onlyPrint(applyFilters(mob,mob,null,msg,false),false);
 	}
 
 	@Override
@@ -1370,19 +1377,19 @@ public class DefaultSession implements Session
 	@Override
 	public void stdPrint(final String msg)
 	{
-		rawPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,mob,mob,null,msg,false));
+		rawPrint(applyFilters(mob,mob,null,msg,false));
 	}
 
 	@Override
 	public void print(final Physical src, final Environmental trg, final Environmental tol, final String msg)
 	{
-		onlyPrint((CMLib.coffeeFilter().fullOutFilter(this,mob,src,trg,tol,msg,false)),false);
+		onlyPrint((applyFilters(src,trg,tol,msg,false)),false);
 	}
 
 	@Override
 	public void stdPrint(final Physical src, final Environmental trg, final Environmental tol, final String msg)
 	{
-		rawPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,src,trg,trg,msg,false));
+		rawPrint(applyFilters(src,trg,trg,msg,false));
 	}
 
 	@Override
@@ -1396,7 +1403,7 @@ public class DefaultSession implements Session
 	public void wraplessPrintln(final String msg)
 	{
 		if(msg!=null)
-			onlyPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,mob,mob,null,msg,true)+"\n\r",false);
+			onlyPrint(applyFilters(mob,mob,null,msg,true)+"\n\r",false);
 		needPrompt=true;
 	}
 
@@ -1404,7 +1411,7 @@ public class DefaultSession implements Session
 	public void wraplessPrint(final String msg)
 	{
 		if(msg!=null)
-			onlyPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,mob,mob,null,msg,true),false);
+			onlyPrint(applyFilters(mob,mob,null,msg,true),false);
 		needPrompt=true;
 	}
 
@@ -1436,25 +1443,50 @@ public class DefaultSession implements Session
 		needPrompt=true;
 	}
 
+	protected String applyFilters(final Physical src, final Environmental trg, final Environmental tol, final String msg, final boolean noWrap)
+	{
+		if(msg!=null)
+		{
+			if(!textFilters.isEmpty())
+			{
+				String newMsg = msg;
+				for(final Iterator<SessionFilter> s=textFilters.iterator();s.hasNext();)
+				{
+					final SessionFilter filter = s.next();
+					newMsg = filter.applyFilter(mob, src, trg, tol, newMsg);
+					if(newMsg == null)
+					{
+						s.remove();
+						return CMLib.coffeeFilter().fullOutFilter(this,mob,src,trg,tol,msg,noWrap);
+					}
+				}
+				return CMLib.coffeeFilter().fullOutFilter(this,mob,src,trg,tol,newMsg,noWrap);
+			}
+			else
+				return CMLib.coffeeFilter().fullOutFilter(this,mob,src,trg,tol,msg,noWrap);
+		}
+		return msg;
+	}
+
 	@Override
 	public void stdPrintln(final String msg)
 	{
 		if(msg!=null)
-			rawPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,mob,mob,null,msg,false)+"\n\r");
+			rawPrint(applyFilters(mob,mob,null,msg,false)+"\n\r");
 	}
 
 	@Override
 	public void println(final Physical src, final Environmental trg, final Environmental tol, final String msg)
 	{
 		if(msg!=null)
-			onlyPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,src,trg,tol,msg,false)+"\n\r",false);
+			onlyPrint(applyFilters(src,trg,tol,msg,false)+"\n\r",false);
 	}
 
 	@Override
-	public void stdPrintln(final Physical src,final Environmental trg, final Environmental tol, final String msg)
+	public void stdPrintln(final Physical src, final Environmental trg, final Environmental tol, final String msg)
 	{
 		if(msg!=null)
-			rawPrint(CMLib.coffeeFilter().fullOutFilter(this,mob,src,trg,tol,msg,false)+"\n\r");
+			rawPrint(applyFilters(src,trg,tol,msg,false)+"\n\r");
 	}
 
 	@Override
@@ -1539,33 +1571,7 @@ public class DefaultSession implements Session
 			if(pstats.getColorStr().length()==0)
 				clookup=CMLib.color().standardColorLookups();
 			else
-			{
-				clookup=CMLib.color().standardColorLookups().clone();
-				final List<String> changesList = CMParms.parseAny(pstats.getColorStr(), '#', true);
-				for(final String change : changesList)
-				{
-					int subChar;
-					String subColor;
-					if(change.startsWith("(") && (change.indexOf(')')>0))
-					{
-						final int x=change.indexOf(')');
-						subChar=CMath.s_int(change.substring(1,x));
-						subColor = change.substring(x+1);
-					}
-					else
-					{
-						subChar=change.charAt(0);
-						subColor=change.substring(1);
-					}
-					clookup[subChar]=CMLib.color().translateCMCodeToANSI(subColor);
-				}
-				for(int i=0;i<clookup.length;i++)
-				{
-					final String s=clookup[i];
-					if((s!=null)&&(s.startsWith("^"))&&(s.length()>1))
-						clookup[i]=clookup[s.charAt(1)];
-				}
-			}
+				clookup=CMLib.color().fixPlayerColorDefs(lastColorStr);
 		}
 		return clookup;
 	}
@@ -2554,11 +2560,12 @@ public class DefaultSession implements Session
 				}
 				if(!CMLib.flags().isCloaked(M))
 				{
-					final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LOGOFFS);
+					final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LOGOFFS, M);
 					for(int i=0;i<channels.size();i++)
 						CMLib.commands().postChannel(channels.get(i),M.clans(),L("@x1 has logged out",name),true);
 				}
-				CMLib.login().notifyFriends(M,L("^X@x1 has logged off.^.^?",M.Name()));
+				if(!M.isAttributeSet(Attrib.PRIVACY))
+					CMLib.login().notifyFriends(M,L("^X@x1 has logged off.^.^?",M.Name()));
 
 				// the player quit message!
 				CMLib.threads().executeRunnable(groupName,new LoginLogoutThread(M,CMMsg.MSG_QUIT));
@@ -2595,6 +2602,7 @@ public class DefaultSession implements Session
 			stopSession(false,false,false);
 		else
 		{
+			Log.debugOut("prelogout done"); //BZ:DELME
 			preLogout(M);
 			if(removeMOB)
 				M.removeFromGame(true, false);
@@ -2838,6 +2846,16 @@ public class DefaultSession implements Session
 			if(mob.playerStats()!=null)
 				CMLib.threads().suspendResumeRecurse(mob, false, false);
 			userLoginTime=System.currentTimeMillis();
+			final String ansiStr;
+			if((mob.isAttributeSet(MOB.Attrib.ANSI)&&getClientTelnetMode(Session.TELNET_ANSI)))
+			{
+				if(!mob.isAttributeSet(MOB.Attrib.ANSI16))
+					ansiStr = " ANSI";
+				else
+					ansiStr = " ANSI-16";
+			}
+			else
+				ansiStr="";
 			final StringBuilder loginMsg=new StringBuilder("");
 			loginMsg.append(getAddress()).append(" "+terminalType)
 			.append(((mob.isAttributeSet(MOB.Attrib.MXP)&&getClientTelnetMode(Session.TELNET_MXP)))?" MXP":"")
@@ -2845,7 +2863,7 @@ public class DefaultSession implements Session
 			.append(getClientTelnetMode(Session.TELNET_ATCP)?" ATCP":"")
 			.append(getClientTelnetMode(Session.TELNET_GMCP)?" GMCP":"")
 			.append((getClientTelnetMode(Session.TELNET_COMPRESS)||getClientTelnetMode(Session.TELNET_COMPRESS2))?" CMP":"")
-			.append(((mob.isAttributeSet(MOB.Attrib.ANSI)&&getClientTelnetMode(Session.TELNET_ANSI)))?" ANSI":"")
+			.append(ansiStr)
 			.append(", character login: "+mob.Name());
 			Log.sysOut(loginMsg.toString());
 			if(loginResult != CharCreationLibrary.LoginResult.NO_LOGIN)
@@ -3137,7 +3155,7 @@ public class DefaultSession implements Session
 					if(getIdleMillis()>=600000)
 					{
 						setAfkFlag(true);
-						if((mob.isPlayer())&&(CMProps.getIntVar(CMProps.Int.RP_GOAFK)>0))
+						if((mob.isPlayer())&&(CMProps.getIntVar(CMProps.Int.RP_GOAFK)!=0))
 							CMLib.leveler().postRPExperience(mob, null, "", CMProps.getIntVar(CMProps.Int.RP_GOAFK), false);
 					}
 				}
@@ -3367,6 +3385,19 @@ public class DefaultSession implements Session
 		{
 			return (activeMillis>0)?System.currentTimeMillis()-activeMillis:0;
 		}
+	}
+
+	@Override
+	public boolean addSessionFilter(final SessionFilter filter)
+	{
+		if(filter == null)
+			return false;
+		if(!textFilters.contains(filter))
+		{
+			this.textFilters.add(filter);
+			return true;
+		}
+		return false;
 	}
 
 	@Override

@@ -107,13 +107,13 @@ public class CombatAbilities extends ActiveTicker
 			}
 			return;
 		}
-		final Vector<String> V=CMParms.parse(theParms.trim());
-		final Vector<CharClass> classes=new Vector<CharClass>();
+		final List<String> V=CMParms.parse(theParms.trim());
+		final List<CharClass> classes=new ArrayList<CharClass>();
 		for(int v=0;v<V.size();v++)
 		{
-			C=CMClass.findCharClass(V.elementAt(v));
+			C=CMClass.findCharClass(V.get(v));
 			if((C!=null)&&(C.availabilityCode()!=0))
-				classes.addElement(C);
+				classes.add(C);
 		}
 		if(classes.size()==0)
 		{
@@ -127,7 +127,7 @@ public class CombatAbilities extends ActiveTicker
 		}
 		for(int i=0;i<classes.size();i++)
 		{
-			C=classes.elementAt(i);
+			C=classes.get(i);
 			mob.baseCharStats().setCurrentClass(C);
 			mob.baseCharStats().setClassLevel(C,mob.basePhyStats().level()/classes.size());
 		}
@@ -152,6 +152,36 @@ public class CombatAbilities extends ActiveTicker
 		return CMParms.combine(V,0);
 	}
 
+	@Override
+	public void endBehavior(final PhysicalAgent forMe)
+	{
+		if(CMProps.getBoolVar(CMProps.Bool.MUDSTARTED)
+		&&(!CMProps.getBoolVar(CMProps.Bool.MUDSHUTTINGDOWN))
+		&&(forMe != null)
+		&&(!forMe.amDestroyed()))
+		{
+			// what these classes do to mobs is just too grotesque for words
+			// so let's just reset the bastards to stock
+			if(forMe instanceof MOB)
+			{
+				final MOB M=(MOB)forMe;
+				if(M.isGeneric()
+				&&(!M.amDead()))
+				{
+					final Room room=M.getStartRoom();
+					{
+						if(room != null)
+						{
+							// this is just scary.. there must be a better way...
+							//M.bringToLife(room, true);
+						}
+					}
+				}
+			}
+		}
+		super.endBehavior(forMe);
+	}
+	
 	protected void newCharacter(final MOB mob)
 	{
 		final Set<Ability> oldAbilities=new HashSet<Ability>();

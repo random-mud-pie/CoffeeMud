@@ -243,35 +243,30 @@ public class Composting extends GatheringSkill
 		return true;
 	}
 
-	protected int[][] fetchFoundResourceData(final MOB mob, int req1Required, String req1Desc, final int[] req1)
+	protected int[][] fetchFoundResourceData(final MOB mob, int req1Required, String req1Desc, final Item first)
 	{
-		final int[][] data=new int[2][2];
+		final int[][] data=new int[2][3];
 		if((req1Desc!=null)&&(req1Desc.length()==0))
 			req1Desc=null;
 
-		Item firstWood=null;
-		if(req1!=null)
-		{
-			for (final int element : req1)
-			{
-				if((element&RawMaterial.RESOURCE_MASK)==0)
-					firstWood=CMLib.materials().findMostOfMaterial(mob.location(),element);
-				else
-					firstWood=CMLib.materials().findFirstResource(mob.location(),element);
+		final Item firstWood=first;
 
-				if(firstWood!=null)
-					break;
-			}
-		}
-		else
-		if(req1Desc!=null)
-			firstWood=CMLib.materials().fetchFoundOtherEncoded(mob.location(),req1Desc);
-
+		String subType = "";
 		data[0][CraftingSkill.FOUND_AMT]=0;
 		if(firstWood!=null)
 		{
-			data[0][CraftingSkill.FOUND_AMT]=CMLib.materials().findNumberOfResource(mob.location(),(RawMaterial)firstWood);
+			if(firstWood instanceof RawMaterial)
+			{
+				subType = ((RawMaterial)first).getSubType();
+				data[0][CraftingSkill.FOUND_AMT]=CMLib.materials().findNumberOfResource(mob.location(),(RawMaterial)firstWood);
+			}
+			else
+				data[0][CraftingSkill.FOUND_AMT]=1;
 			data[0][CraftingSkill.FOUND_CODE]=firstWood.material();
+			if(firstWood instanceof RawMaterial)
+				data[0][CraftingSkill.FOUND_SUB]=(((RawMaterial)firstWood).getSubType()).hashCode();
+			else
+				data[0][CraftingSkill.FOUND_SUB]="".hashCode();
 		}
 
 		if(req1Required>0)
@@ -288,7 +283,7 @@ public class Composting extends GatheringSkill
 		if(req1Required>data[0][CraftingSkill.FOUND_AMT])
 		{
 			commonTell(mob,L("You need @x1 pounds of @x2 to do that.  There is not enough here.  Are you sure you set it all on the ground first?",
-					""+req1Required,RawMaterial.CODES.NAME(data[0][CraftingSkill.FOUND_CODE]).toLowerCase()));
+					""+req1Required,CMLib.materials().makeResourceSimpleName(first.material(), subType).toLowerCase()));
 			return null;
 		}
 		data[0][CraftingSkill.FOUND_AMT]=req1Required;
@@ -310,14 +305,20 @@ public class Composting extends GatheringSkill
 				return bundle(mob,commands);
 			return false;
 		}
-
-		int amount=CMath.s_int(commands.get(0));
-		if(commands.get(0).equalsIgnoreCase("ALL"))
-			amount=Integer.MAX_VALUE;
-		if(amount<=0)
-			amount=1;
-		else
-			commands.remove(0);
+		
+		if(commands.size()==0)
+		{
+			if(auto)
+			{
+				// ?
+				return false;
+			}
+			else
+			{
+				mob.tell(L("Compost how much of what?"));
+				return false;
+			}
+		}
 
 		verb=L("composting");
 		if(mob.isMonster()
@@ -358,9 +359,17 @@ public class Composting extends GatheringSkill
 		else
 		if(commands.size()==0)
 		{
-			commonTell(mob,L("Compost what?"));
+			commonTell(mob,L("Compost how much of what?"));
 			return false;
 		}
+		int amount=CMath.s_int(commands.get(0));
+		if(commands.get(0).equalsIgnoreCase("ALL"))
+			amount=Integer.MAX_VALUE;
+		if(amount<=0)
+			amount=1;
+		else
+			commands.remove(0);
+
 		foundShortName = CMParms.combine(commands);
 		final Item mine=super.getTarget(mob, mob.location(), givenTarget, commands, new Filterer<Environmental>()
 		{
@@ -383,14 +392,14 @@ public class Composting extends GatheringSkill
 		}
 		foundShortName = mine.name();
 		Item found=mine;
-		final int[][] data=fetchFoundResourceData(mob,amount,"material",new int[]{mine.material()});
+		final int[][] data=fetchFoundResourceData(mob,amount,"material",mine);
 		if(data==null)
 			return false;
 
 		if(!super.invoke(mob,commands,givenTarget,auto,asLevel))
 			return false;
 
-		CMLib.materials().destroyResourcesValue(mob.location(),amount,data[0][CraftingSkill.FOUND_CODE],0,null);
+		CMLib.materials().destroyResourcesAmt(mob.location(),amount,data[0][CraftingSkill.FOUND_CODE],((RawMaterial)found).getSubType(), null);
 		this.compost=null;
 		if(proficiencyCheck(mob,0,auto))
 		{

@@ -959,8 +959,7 @@ public class GenSailingShip extends StdBoardable implements SailingShip
 							dirNames.add(CMLib.directions().getDirectionName(dir).toLowerCase());
 							this.courseDirections.add(Integer.valueOf(dir));
 						}
-						if(this.courseDirections.size()>0)
-							this.courseDirection = this.courseDirections.remove(0).intValue();
+						this.courseDirection = this.removeTopCourse();
 						if((this.courseDirections.size()==0)||(getBottomCourse()>=0))
 							this.courseDirections.add(Integer.valueOf(-1));
 
@@ -1664,8 +1663,7 @@ public class GenSailingShip extends StdBoardable implements SailingShip
 					{
 						if(this.courseDirections.size()>0)
 						{
-							final Integer newDir=this.courseDirections.remove(0);
-							courseDirection = newDir.intValue();
+							this.courseDirection = this.removeTopCourse();
 						}
 						else
 						{
@@ -2190,7 +2188,7 @@ public class GenSailingShip extends StdBoardable implements SailingShip
 								this.announceActionToUnderDeck(msg.source(), sinkString);
 							}
 
-							if(!CMLib.leveler().postExperienceToAllAboard(msg.source().riding(), 500))
+							if(!CMLib.leveler().postExperienceToAllAboard(msg.source().riding(), 500, this))
 								CMLib.leveler().postExperience(msg.source(), null, null, 500, false);
 							this.clearTacticalMode();
 						}
@@ -2898,6 +2896,19 @@ public class GenSailingShip extends StdBoardable implements SailingShip
 		{
 			if(this.courseDirections.size()>0)
 				return this.courseDirections.get(0).intValue();
+		}
+		catch(final Exception e)
+		{
+		}
+		return -1;
+	}
+
+	protected int removeTopCourse()
+	{
+		try
+		{
+			if(this.courseDirections.size()>0)
+				return this.courseDirections.remove(0).intValue();
 		}
 		catch(final Exception e)
 		{

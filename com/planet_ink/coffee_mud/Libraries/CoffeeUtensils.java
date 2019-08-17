@@ -81,6 +81,51 @@ public class CoffeeUtensils extends StdLibrary implements CMMiscUtils
 		return id;
 	}
 
+	protected int getSimpleWeight(final Physical P)
+	{
+		if(P instanceof Item)
+			return ((Item)P).recursiveWeight();
+		else
+			return P.phyStats().weight();
+	}
+
+	@Override
+	public int getPullWeight(final Physical P)
+	{
+		if(P instanceof Rider)
+		{
+			Rider R=(Rider)P;
+			int ct=99;
+			while((R.riding() != null) &&(--ct>0))
+				R=R.riding();
+			if(R instanceof Rideable)
+			{
+				int totalWeight=0;
+				final boolean smallWeight = (((Rideable)R).rideBasis()==Rideable.RIDEABLE_WAGON);
+				final LinkedList<Rider> weightsToDo = new LinkedList<Rider>();
+				weightsToDo.add(R);
+				while((weightsToDo.size()>0)
+				&&(totalWeight < Integer.MAX_VALUE/2))
+				{
+					R=weightsToDo.pop();
+					totalWeight += getSimpleWeight(R);
+					if(R instanceof Rideable)
+					{
+						for(final Enumeration<Rider> r=((Rideable)R).riders();r.hasMoreElements();)
+							weightsToDo.addLast(r.nextElement());
+					}
+				}
+				if(smallWeight)
+					totalWeight /= 300;
+				return totalWeight;
+			}
+			else
+				return getSimpleWeight(P);
+		}
+		else
+			return getSimpleWeight(P);
+	}
+
 	@Override
 	public String getFormattedDate(final Environmental E)
 	{
@@ -701,6 +746,7 @@ public class CoffeeUtensils extends StdLibrary implements CMMiscUtils
 	public boolean armorCheck(final MOB mob, final Item I, final int allowedArmorLevel)
 	{
 		if((((I instanceof Armor)||(I instanceof Shield)))
+		&&(!(I instanceof FalseLimb))
 		&&(I.rawProperLocationBitmap()&CharClass.ARMOR_WEARMASK)>0)
 		{
 			DoubleFilterer.Result filterResult = DoubleFilterer.Result.NOTAPPLICABLE;
@@ -1494,6 +1540,56 @@ public class CoffeeUtensils extends StdLibrary implements CMMiscUtils
 					c++;
 					break;
 				}
+				case 'B':
+				{
+					buf.append("\n\r");
+					c++;
+					break;
+				}
+				case 'c':
+				{
+					buf.append(mob.numItems());
+					c++;
+					break;
+				}
+				case 'C':
+				{
+					buf.append(mob.maxItems());
+					c++;
+					break;
+				}
+				case 'd':
+				{
+					final MOB victim = mob.getVictim();
+					if ((mob.isInCombat()) && (victim != null))
+						buf.append("" + mob.rangeToTarget());
+					c++;
+					break;
+				}
+				case 'D':
+				{
+					final Item I = mob.fetchWieldedItem();
+					if ((I instanceof AmmunitionWeapon) && (((AmmunitionWeapon) I).requiresAmmunition()))
+						buf.append("" + ((AmmunitionWeapon) I).ammunitionRemaining());
+					c++;
+					break;
+				}
+				case 'e':
+				{
+					final MOB victim = mob.getVictim();
+					if ((mob.isInCombat()) && (victim != null) && (CMLib.flags().canBeSeenBy(victim, mob)))
+						buf.append(victim.name(mob));
+					c++;
+					break;
+				}
+				case 'E':
+				{
+					final MOB victim = mob.getVictim();
+					if ((mob.isInCombat()) && (victim != null) && (!victim.amDead()) && (CMLib.flags().canBeSeenBy(victim, mob)))
+						buf.append(victim.healthText(mob) + "\n\r");
+					c++;
+					break;
+				}
 				case 'f':
 				{
 					if(c<(prompt.length()-3))
@@ -1546,56 +1642,6 @@ public class CoffeeUtensils extends StdLibrary implements CMMiscUtils
 							}
 						}
 					}
-					break;
-				}
-				case 'B':
-				{
-					buf.append("\n\r");
-					c++;
-					break;
-				}
-				case 'c':
-				{
-					buf.append(mob.numItems());
-					c++;
-					break;
-				}
-				case 'C':
-				{
-					buf.append(mob.maxItems());
-					c++;
-					break;
-				}
-				case 'd':
-				{
-					final MOB victim = mob.getVictim();
-					if ((mob.isInCombat()) && (victim != null))
-						buf.append("" + mob.rangeToTarget());
-					c++;
-					break;
-				}
-				case 'D':
-				{
-					final Item I = mob.fetchWieldedItem();
-					if ((I instanceof AmmunitionWeapon) && (((AmmunitionWeapon) I).requiresAmmunition()))
-						buf.append("" + ((AmmunitionWeapon) I).ammunitionRemaining());
-					c++;
-					break;
-				}
-				case 'e':
-				{
-					final MOB victim = mob.getVictim();
-					if ((mob.isInCombat()) && (victim != null) && (CMLib.flags().canBeSeenBy(victim, mob)))
-						buf.append(victim.name(mob));
-					c++;
-					break;
-				}
-				case 'E':
-				{
-					final MOB victim = mob.getVictim();
-					if ((mob.isInCombat()) && (victim != null) && (!victim.amDead()) && (CMLib.flags().canBeSeenBy(victim, mob)))
-						buf.append(victim.healthText(mob) + "\n\r");
-					c++;
 					break;
 				}
 				case 'g':
@@ -1760,6 +1806,45 @@ public class CoffeeUtensils extends StdLibrary implements CMMiscUtils
 				{
 					if (mob.location() != null)
 						buf.append(mob.location().getArea().getTimeObj().getHourOfDay());
+					c++;
+					break;
+				}
+				case 'u':
+				{
+					final List<String> spellsOnCooldown=new ArrayList<String>(1);
+					for(final Enumeration<Ability> a=mob.abilities();a.hasMoreElements();)
+					{
+						final Ability A=a.nextElement();
+						if(A!=null)
+						{
+							final AbilityMapper.CompoundingRule rule = CMLib.ableMapper().getCompoundingRule(mob, A);
+							if((rule!=null)
+							&&(rule.compoundingTicks()>0))
+							{
+								final int[] consumed=A.usageCost(mob,false);
+								if(consumed != null)
+								{
+									final int[] timeCache;
+									final int nowLSW = (int)(System.currentTimeMillis()&0x7FFFFFFF);
+									final int[][] abilityUsageCache=mob.getAbilityUsageCache(A.ID());
+									if(abilityUsageCache[Ability.CACHEINDEX_LASTTIME] == null)
+										continue;
+									timeCache = abilityUsageCache[Ability.CACHEINDEX_LASTTIME];
+									if(timeCache[Ability.USAGEINDEX_TIMELSW]>nowLSW)
+										continue;
+									final int numTicksSinceLastCast=(int)((nowLSW-timeCache[Ability.USAGEINDEX_TIMELSW]) / CMProps.getTickMillis());
+									if(numTicksSinceLastCast >= rule.compoundingTicks())
+										continue;
+									if(((consumed[Ability.USAGEINDEX_MANA])>0)
+									||((consumed[Ability.USAGEINDEX_MOVEMENT])>0)
+									||((consumed[Ability.USAGEINDEX_HITPOINTS])>0))
+										spellsOnCooldown.add(A.Name());
+								}
+							}
+						}
+					}
+					if(spellsOnCooldown.size()>0)
+						buf.append(CMParms.toListString(spellsOnCooldown));
 					c++;
 					break;
 				}

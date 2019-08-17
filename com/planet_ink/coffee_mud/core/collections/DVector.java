@@ -39,6 +39,8 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 	private SVector<Object[]> 	stuff;
 	private final static int 	MAX_SIZE=9;
 
+	public final static DVector empty = new DVector(1);
+
 	public DVector(final int dim)
 	{
 		if(dim<1)
@@ -59,16 +61,19 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		stuff=new SVector<Object[]>(startingSize);
 	}
 
+	@Override
 	public synchronized void clear()
 	{
 		stuff.clear();
 	}
 
+	@Override
 	public synchronized void trimToSize()
 	{
 		stuff.trimToSize();
 	}
 
+	@Override
 	public synchronized int indexOf(final Object O)
 	{
 		int x=0;
@@ -87,6 +92,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return -1;
 	}
 
+	@Override
 	public synchronized Object[] elementsAt(final int x)
 	{
 		if((x<0)||(x>=stuff.size()))
@@ -94,6 +100,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return stuff.elementAt(x);
 	}
 
+	@Override
 	public synchronized Object[] removeElementsAt(final int x)
 	{
 		if((x<0)||(x>=stuff.size()))
@@ -103,6 +110,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return O;
 	}
 
+	@Override
 	public synchronized DVector copyOf()
 	{
 		final DVector V=new DVector(dimensions);
@@ -114,6 +122,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return V;
 	}
 
+	@Override
 	public synchronized void sortBy(int dim)
 	{
 		if((dim<1)||(dim>dimensions))
@@ -153,6 +162,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return DV;
 	}
 
+	@Override
 	public synchronized void addSharedElements(final Object[] O)
 	{
 		if(dimensions!=O.length)
@@ -160,6 +170,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		stuff.addElement(O);
 	}
 
+	@Override
 	public synchronized void addElement(final Object... Os)
 	{
 		if(dimensions!=Os.length)
@@ -167,6 +178,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		stuff.addElement(Os);
 	}
 
+	@Override
 	public synchronized void add(final Object... Os)
 	{
 		if(dimensions!=Os.length)
@@ -174,11 +186,13 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		stuff.addElement(Os);
 	}
 
+	@Override
 	public boolean contains(final Object O)
 	{
 		return indexOf(O)>=0;
 	}
 
+	@Override
 	public synchronized boolean containsIgnoreCase(final String S)
 	{
 		if(S==null)
@@ -191,28 +205,33 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return false;
 	}
 
+	@Override
 	public int size()
 	{
 		return stuff.size();
 	}
 
+	@Override
 	public synchronized void removeElementAt(final int i)
 	{
 		if(i>=0)
 			stuff.removeElementAt(i);
 	}
 
+	@Override
 	public synchronized void remove(final int i)
 	{
 		if(i>=0)
 			stuff.removeElementAt(i);
 	}
 
+	@Override
 	public synchronized void removeElement(final Object O)
 	{
 		removeElementAt(indexOf(O));
 	}
 
+	@Override
 	public synchronized List<Object> getDimensionList(final int dim)
 	{
 		final Vector<Object> V=new Vector<Object>(stuff.size());
@@ -223,6 +242,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return V;
 	}
 
+	@Override
 	public synchronized List<Object> getRowList(final int row)
 	{
 		final Vector<Object> V=new Vector<Object>(dimensions);
@@ -232,6 +252,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return V;
 	}
 
+	@Override
 	public synchronized Object elementAt(final int i, final int dim)
 	{
 		if(dimensions<dim)
@@ -239,6 +260,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return (stuff.elementAt(i))[dim-1];
 	}
 
+	@Override
 	public synchronized Object get(final int i, final int dim)
 	{
 		if(dimensions<dim)
@@ -246,6 +268,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		return (stuff.elementAt(i))[dim-1];
 	}
 
+	@Override
 	public synchronized void setElementAt(final int index, final int dim, final Object O)
 	{
 		if(dimensions<dim)
@@ -253,6 +276,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		stuff.elementAt(index)[dim-1]=O;
 	}
 
+	@Override
 	public synchronized void set(final int index, final int dim, final Object O)
 	{
 		if(dimensions<dim)
@@ -260,6 +284,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		stuff.elementAt(index)[dim-1]=O;
 	}
 
+	@Override
 	public synchronized void insertElementAt(final int here, final Object... Os)
 	{
 		if(dimensions!=Os.length)
@@ -267,6 +292,7 @@ public class DVector implements Cloneable, NList<Object>, java.io.Serializable
 		stuff.insertElementAt(Os,here);
 	}
 
+	@Override
 	public synchronized void add(final int here, final Object... Os)
 	{
 		if(dimensions!=Os.length)

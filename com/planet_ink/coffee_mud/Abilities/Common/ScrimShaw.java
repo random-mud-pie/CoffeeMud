@@ -469,7 +469,10 @@ public class ScrimShaw extends EnhancedCraftingSkill implements ItemCraftor, Men
 			if((componentsFoundList.size() > 0)||(autoGenerate>0))
 				deadMats = new MaterialLibrary.DeadResourceRecord();
 			else
-				deadMats = CMLib.materials().destroyResources(mob.location(),woodRequired,data[0][FOUND_CODE],data[1][FOUND_CODE],null,null);
+			{
+				deadMats = CMLib.materials().destroyResources(mob.location(),woodRequired,
+						data[0][FOUND_CODE],data[0][FOUND_SUB],data[1][FOUND_CODE],data[1][FOUND_SUB]);
+			}
 			final MaterialLibrary.DeadResourceRecord deadComps = CMLib.ableComponents().destroyAbilityComponents(componentsFoundList);
 			final int lostValue=autoGenerate>0?0:(deadMats.lostValue + deadComps.lostValue);
 			buildingI=CMClass.getItem(foundRecipe.get(RCP_CLASSTYPE));
@@ -490,7 +493,7 @@ public class ScrimShaw extends EnhancedCraftingSkill implements ItemCraftor, Men
 			displayText=L("You are scrimshawing @x1",buildingI.name());
 			verb=L("scrimshawing @x1",buildingI.name());
 			buildingI.setDisplayText(L("@x1 lies here",itemName));
-			buildingI.setDescription(itemName+". ");
+			buildingI.setDescription(determineDescription(itemName, buildingI.material(), deadMats, deadComps));
 			buildingI.basePhyStats().setWeight(getStandardWeight(woodRequired+compData[CF_AMOUNT],data[1][FOUND_CODE], bundling));
 			buildingI.setBaseValue(CMath.s_int(foundRecipe.get(RCP_VALUE))+(woodRequired*(RawMaterial.CODES.VALUE(data[0][FOUND_CODE]))));
 			buildingI.basePhyStats().setLevel(CMath.s_int(foundRecipe.get(RCP_LEVEL)));

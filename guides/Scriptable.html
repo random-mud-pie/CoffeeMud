@@ -1,9 +1,9 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"><head>
-  <meta name="generator" content="HTML Tidy, see www.w3.org" />
+
+  <meta name="generator" content="HTML Tidy, see www.w3.org" /><title>Scripting in CoffeeMud 5.9</title>
   
-  <title>Scripting in CoffeeMud 5.9</title><link rel="StyleSheet" href="style.css" type="text/css" media="screen" /><!-- Modified by Josh Mueller, 2006-05-05, fix validation problems, add index, and fix spelling errors --><!-- Modified by Josh Mueller, 2006-05-06, add close_prog, lock_prog, unlock_prog, open_prog --></head>
-<body>
+  <link rel="StyleSheet" href="style.css" type="text/css" media="screen" /><!-- Modified by Josh Mueller, 2006-05-05, fix validation problems, add index, and fix spelling errors --><!-- Modified by Josh Mueller, 2006-05-06, add close_prog, lock_prog, unlock_prog, open_prog --></head><body>
 <center>
 <table border="1" cellpadding="10" cellspacing="0" width="90%">
   <tbody>
@@ -54,7 +54,7 @@
             <li><a href="#once_prog">once_prog</a></li>
             <li><a href="#open_prog">open_prog</a></li>
             <li><a href="#quest_time_prog">quest_time_prog</a></li>
-            <li><a href="#put_prog">put_prog</a></li>
+            <li><a href="#put_prog">put_prog</a></li><li><a href="#putting_prog">putting_prog</a></li>
             <li><a href="#rand_prog">rand_prog</a></li>
             <li><a href="#regmask_prog">regmask_prog</a></li>
             <li><a href="#remove_prog">remove_prog</a></li>
@@ -87,7 +87,7 @@
             <li><a href="#mpbeacon">mpbeacon</a></li>
             <li><a href="#mpbehave">mpbehave</a></li>
             <li><a href="#mpcallfunc">mpcallfunc</a></li>
-            <li><a href="#mpcast">mpcast</a></li>
+            <li><a href="#mpcast">mpcast</a></li><li><a href="#mpcastext">mpcastext</a></li>
             <li><a href="#mpchannel">mpchannel</a></li>
             <li><a href="#mpchoose">mpchoose</a></li>
             <li><a href="#mpclose">mpclose</a></li>
@@ -108,7 +108,7 @@
             <li><a href="#mpheal">mpheal</a></li>
             <li><a href="#mphide">mphide</a></li>
             <li><a href="#mpjunk">mpjunk</a></li>
-            <li><a href="#mpkill">mpkill</a></li>
+            <li><a href="#mpkill">mpkill</a></li><li><a href="#mplink">mplink</a></li>
             <li><a href="#mploadquestobj">mploadquestobj</a></li>
             <li><a href="#mploadvar">mploadvar</a></li>
             <li><a href="#mplock">mplock</a></li>
@@ -125,7 +125,7 @@
             <li><a href="#mppossess">mppossess</a></li>
             <li><a href="#mppracs">mppracs</a></li>
             <li><a href="#mpprompt">mpprompt</a></li>
-            <li><a href="#mppurge">mppurge</a></li>
+            <li><a href="#mppurge">mppurge</a></li><li><a href="#mpput">mpput</a></li>
             <li><a href="#mpquestpoints">mpquestpoints</a></li>
             <li><a href="#mpquestwin">mpquestwin</a></li>
             <li><a href="#mpqset">mpqset</a></li>
@@ -153,7 +153,7 @@
             <li><a href="#mpunloadscript">mpunloadscript</a></li>
             <li><a href="#mpunlock">mpunlock</a></li>
             <li><a href="#mpwhile">mpwhile</a></li>
-            <li><a href="#mpwalkto">mpwalkto</a></li>
+            <li><a href="#mpwalkto">mpwalkto</a></li><li><a href="#mpunlink">mpunlink</a></li>
             <li><a href="#return">return</a></li>
           </ul>
         </li>
@@ -631,7 +631,7 @@ COMMANDFAIL , METACOMMAND</span>
       <p>And here are some general
 message code types that may also be
 used:</p>
-      <span style="font-family: monospace;">TOUCH,MOVE,EYES,MOUTH,SOUND,GENERAL,MAGIC,DELICATE,MALICIOUS,CHANNEL,OPTIMIZE,CNTRLMSG,INTERMSG</span>
+      <span style="font-family: monospace;">TOUCH, MOVE, EYES, MOUTH, SOUND, GENERAL, MAGIC, DELICATE, MALICIOUS, CHANNEL, OPTIMIZE, CNTRLMSG, INTERMSG, UNINTENTIONAL</span>
       <p>For truly advanced users,
 you can also prefix a message code
 with some combination of the letters S, O, and T followed by an equal
@@ -860,7 +860,8 @@ DUELLOSS, COMMANDFAIL, METACOMMAND</span>
       <p>And here are some general
 message code types that may also be
 used:</p>
-      <span style="font-family: monospace;">TOUCH,MOVE,EYES,MOUTH,SOUND,GENERAL,MAGIC,DELICATE,MALICIOUS,CHANNEL,OPTIMIZE,CNTRLMSG,INTERMSG</span>
+      <span style="font-family: monospace;">TOUCH, MOVE, EYES, MOUTH, SOUND, GENERAL, MAGIC, DELICATE, MALICIOUS, CHANNEL, OPTIMIZE, CNTRLMSG, INTERMSG, UNINTENTIONAL<br />
+</span>
       <p>For truly advanced users,
 you can also prefix a message code
 with
@@ -1250,6 +1251,8 @@ activity.</p>
       <pre>llook_prog all<br /></pre>
       <p>This will trigger if any
 
+
+
 the scripted item, room, or mob is
 examined.</p>
       <pre>look_prog all<br /></pre>
@@ -1334,9 +1337,12 @@ the quest 'that quest'.</p>
       <h3><a name="put_prog">put_prog</a></h3>
       <p>Usage:</p>
       <pre>put_prog [keyword list]<br />put_prog p [keyword list]<br />put_prog all<br /></pre>
-      <p>This type of mobprog is
-triggered by putting something in a
-container. If the container being used matches the keywords of the
+      <p>This
+type of mobprog is
+triggered by observing something being put in a
+container, or by the scripted object being a matching container that
+something is being put into. It does not trigger if the scripted object
+is the thing being put into the container. &nbsp;</p><p>Now, if the container involved matches the keywords of the
 put_prog, the prog is triggered. If there is a &#8216;p' placed
 before
 the keyword list, the keywords of the object must exactly match that of
@@ -1369,7 +1375,44 @@ Generally it is best not to have put_progs with the same keywords in
 them, unless they are a put_prog p with different keyword lists but
 some of the same keywords &#8211; for example a put_prog p apple
 red
-juicy and a put_prog p apple red poisoned.</p>
+juicy and a put_prog p apple red poisoned.
+      </p><h3><a name="putting_prog">putting_prog</a></h3>
+      <p>Usage:</p>
+      <pre>putting_prog [keyword list]<br />putting_prog p [keyword list]<br />putting_prog all<br /></pre>
+      <p>This
+type of mobprog is
+triggered by putting a matched thing into a
+container. It does not trigger if the scripted object is the container
+itself, however.&nbsp;If the object being put into the container
+matches the keywords of the
+put_prog, the prog is triggered. If there is a &#8216;p' placed
+before
+the keyword list, the keywords of the object must exactly match that of
+the put_prog. If there is not, then any object with any of the
+keywords in the list in it will trigger it. If a put_prog all is used,
+then the put_prog will trigger from any item being put in any container
+at all.
+This type of prog is usually used for in-zone quests and special mob
+behavior, and has a variety of uses.</p>
+      <p>EXAMPLES:</p>
+      <pre>putting_prog key skeleton<br /></pre>
+      <p>This will trigger if &nbsp;an object with the
+keywords key or skeleton is being put into a container.&nbsp;</p>
+      <pre>putting_prog p the skeleton key<br /></pre>
+      <p>This
+will trigger if the item with exact
+keywords the skeleton key is being put into a container. The prog would not be triggered by
+items with keywords skeleton or the key or anything except the exact order and wording of the keyword
+list.&nbsp;</p>
+      <pre>putting_prog all<br /></pre>
+      <p>This will trigger if any item is being put somewhere.</p>
+      <p>MULTIPLE PROGS: You can
+have more than one putting_prog on a mob.
+Generally it is best not to have putting_progs with the same keywords in
+them, unless they are a put_prog p with different keyword lists but
+some of the same keywords &#8211; for example a putting_prog p apple
+red
+juicy and a putting_prog p apple red poisoned.</p>
       <h3><a name="rand_prog">rand_prog</a></h3>
       <p>Usage:</p>
       <pre>rand_prog [integer percentage]<br /></pre>
@@ -2509,7 +2552,7 @@ given shopkeeper code. Sets $9 to price.</td>
 variable])</td>
             <td>Returns the value
 of the given stat for the given
-object, mob, or item. See MPSTAT in the section on Commands for more
+object, mob, or item. See MPSET in the section on Commands for more
 information.</td>
           </tr>
           <tr>
@@ -2937,7 +2980,26 @@ require the mob to actually have the skill. Although there is still the
 1-in-20 chance of failure of any skill, and the level of the host will
 affect the probability of success.</p>
       <p>EXAMPLES:</p>
-      <pre>mpcast fireball $r<br />mpcast 'stinking cloud'<br /></pre>
+      <pre>mpcast fireball $r<br />mpcast 'stinking cloud'</pre><h3><a name="mpcastext">mpcastext</a></h3>
+      <p>Usage:</p>
+      mpcastext [spell] [target] [arguments]<br />
+      <p>This
+command causes the
+host mob to cast the given spell,
+chant, prayer, song, or use the given skill against the given target.
+Unlike using the mundane cast command, this scripting form does not
+require the mob to actually have the skill. &nbsp;And unlike MPCAST, it
+also allows you to spell out all of the arguments to the spell, for
+cases where the spell requires that. &nbsp; Remember that in targeted
+spells, the first argument is usually the targets name, so specifying
+that name again can be useful. &nbsp;Also, if you need to separate
+arguments, be sure to use double-quote "" instead of single quotes,
+since those strings will be parsed by the coffeemud engine instead of
+the mobprog engine.</p><p> Although there is still the
+1-in-20 chance of failure of any skill, and the level of the host will
+affect the probability of success.</p>
+      <p>EXAMPLES:</p>
+      mpcast brainwash '$r' "$r" "I'm a pretty princess"<br />
       <h3><a name="mpchannel">mpchannel</a></h3>
       <p>Usage:</p>
       <span style="font-family: monospace;">mpchannel
@@ -3329,6 +3391,15 @@ this command doesn't get used much. It
 was built for other MUD's which might have level requirements for kill,
 etc. You can use it, but it more or less works exactly the same as
 kill, murder, hit, etc.</p>
+      <h3><a name="mplink">mplink</a></h3>
+      <p>Usage:</p>
+mplink [direction] [target room] [exit class id] ([exit name])
+      <p>This
+command allows a standard exit to be created from the room in which the
+scripted object is currently in, to another room in the same area,
+provided the script is only operating in its origin area. &nbsp;It will
+NOT overwrite/obliterate any existing exit in the same direction.</p>
+      <p>EXAMPLE:</p>mplink UP 'My Area#12322' OpenNameable my name
       <h3><a name="mploadquestobj">mploadquestobj</a></h3>
       <p>Usage:</p>
       <pre>mploadquestobj [questname] [variable expression/name] [$var]<br /></pre>
@@ -3675,7 +3746,16 @@ there is no mistake what you are trying to mppurge. Also, you should
 avoid mppurging players, as it basically causes them to be ejected from
 the game. Use this command for mobs that set up special quests and then
 go away, so each zone reset you'll have a fresh zone for adventurers to
-pillage.</p>
+pillage.
+      </p><h3><a name="mpput">mpput</a></h3>
+      <p>Usage:</p>
+      <pre>mpput [item code] [container code]/NONE<br />mpput [mob code] [rideable code]/NONE<br /></pre>
+      <p>This
+command can be used to put an item into a container, remove an item
+from a container (using the NONE container), mount a wagon to a horse,
+or mount a player on a horse. &nbsp;</p>
+      <p>EXAMPLES:</p>
+      <pre>mpput $i 'the horse'<br />mpput $o 'the sack'</pre>
       <h3><a name="mpqset">mpqset</a></h3>
       <p>Usage:</p>
       <pre>mpqset [questname] [variable] [value]<br /></pre>
@@ -3755,12 +3835,16 @@ scripting special events that require a room or areas default mobs or
 items to be present.</p>
       <h3><a name="mpreset">mpreset</a></h3>
       <p>Usage:</p>
-      <pre>mpreset area<br />mpreset room<br />mpreset [area name]<br />mpreset [room id]<br /></pre>
-      <p>This command allows you
+      <pre>mpreset area<br />mpreset room<br />mpreset [area name]<br />mpreset [room id]<br />mpreset [mob code]<br />mpreset [item code]<br /></pre>
+      <p>This
+command allows you
 to force the system to reload an area
 or a room from the database. The keywords area and room will refer to
 the scripted objects current area and room. Otherwise, the name of the
-area, or the full roomID can be specified.</p>
+area, or the full roomID can be specified. &nbsp;It also allows you to
+reset the durability of an item and remove it from any container.
+&nbsp;For mobs, this will reset the targets hit points, mana, and
+movement back to maximum, assuming they are alive and targetable.</p>
       <p>EXAMPLES:</p>
       <pre>mpreset area<br /></pre>
       <p>SPECIAL NOTES: Be very
@@ -4093,7 +4177,12 @@ command line.</p>
 affects of mphide, making the target
 (possibly) visible again.</p>
       <p>EXAMPLES:</p>
-      <pre>mpunhide $n<br /><br /></pre>
+      <pre>mpunhide $n<br /><br /></pre><h3><a name="mpunlink">mpunlink</a></h3>
+      <p>Usage:</p>
+mpunlink [direction]
+      <p>This
+command allows an exit created using the MPLINK command to be removed and destroyed.</p>
+      <p>EXAMPLE:</p>mpunlink UP<span style="font-family: monospace;"><br /></span>
       <h3><a name="mpunhide">mpunloadscript</a></h3>
       <p>Usage:</p>
 mpunloadscript [file name]
@@ -4406,7 +4495,7 @@ character has an amount of time remaining on a temporary&nbsp;tattoo
 assigned to them. &nbsp;Where '==' may be any logical operator
 from above.</p>
       <p>EXAMPLE:</p>
-      <span style="font-family: monospace;">if hastattootime($n beastmark &lt; 15)</span><br style="font-family: monospace;" /><span style="font-family: monospace;">&nbsp;mpecho There is less than 1 minute left on the beastmark!</span><br style="font-family: monospace;" /><span style="font-family: monospace;"></span><span style="font-family: monospace;">endif</span>
+      <span style="font-family: monospace;">if hastattootime($n beastmark &lt; 15)</span><br style="font-family: monospace;" /><span style="font-family: monospace;">&nbsp;mpecho There is less than 1 minute left on the beastmark!</span><br style="font-family: monospace;" /><span style="font-family: monospace;" /><span style="font-family: monospace;">endif</span>
       <h3><a name="hitprcnt">hitprcnt</a></h3>
       <p>Usage:</p>
       <pre>hitprcnt(character == amount)<br /></pre>
@@ -4605,7 +4694,7 @@ code ($x, $xN, $xS, etc..)</p>
       ismonth(integer)<br /><p>This function is used to
 check the mud month number.&nbsp;</p>
       <p>EXAMPLE:</p>
-      <span style="font-family: monospace;">if ismonth(1)</span><br style="font-family: monospace;" /><span style="font-family: monospace;"> mpecho It is month 1.</span><br style="font-family: monospace;" /><span style="font-family: monospace;"></span><span style="font-family: monospace;">endif</span>
+      <span style="font-family: monospace;">if ismonth(1)</span><br style="font-family: monospace;" /><span style="font-family: monospace;"> mpecho It is month 1.</span><br style="font-family: monospace;" /><span style="font-family: monospace;" /><span style="font-family: monospace;">endif</span>
       <h3><a name="ismoon">ismoon</a></h3>
       <p>Usage:</p>
       <pre>ismoon()<br />ismoon(phase)<br /></pre>
@@ -4700,13 +4789,13 @@ If you need to be need to find mobile mobs or items, you can include
 the mob or item name, followed by @ followed by a room id or area name.
 The '==' may also be '!='.</p>
       <p>EXAMPLES:</p>
-      <pre>if isrecall($i == a bathroom)<br /> mpecho This means I am from a bathroom.<br />else<br /> mpecho I am not from a bathroom.<br />endif<br /><br />if isrecall($i != MyArea#20001)<br /> mpecho I am not from room MyArea#20001.<br />else<br /> mpecho I am from room MyArea#20001.<br />endif<br /></pre><h3><a name="isrlhour">isrlhour &nbsp;</a></h3><h3><a name="isrlday"></a>isrlday&nbsp;</h3><h3><a name="isrlmonth"></a>isrlmonth&nbsp;</h3><h3><a name="isrlyear"></a>isrlyear&nbsp;</h3><p>Usage:</p><span style="font-family: monospace;">
+      <pre>if isrecall($i == a bathroom)<br /> mpecho This means I am from a bathroom.<br />else<br /> mpecho I am not from a bathroom.<br />endif<br /><br />if isrecall($i != MyArea#20001)<br /> mpecho I am not from room MyArea#20001.<br />else<br /> mpecho I am from room MyArea#20001.<br />endif<br /></pre><h3><a name="isrlhour">isrlhour &nbsp;</a></h3><h3><a name="isrlday" />isrlday&nbsp;</h3><h3><a name="isrlmonth" />isrlmonth&nbsp;</h3><h3><a name="isrlyear" />isrlyear&nbsp;</h3><p>Usage:</p><span style="font-family: monospace;">
 isrlhour(integer)</span>
       <p>This
 checks the real-life hour of the day (0-23), day of the month (1-31),
 month of the year (1-12), or year against the given integer value..</p>
       <p>EXAMPLES:</p>
-      <span style="font-family: monospace;">if isrlday(15)</span><br style="font-family: monospace;" /><span style="font-family: monospace;"> mpecho This means it is the 15th of the month.</span><br style="font-family: monospace;" /><span style="font-family: monospace;"></span><span style="font-family: monospace;">endif</span><br /><h3><a name="isseason">isseason</a></h3>
+      <span style="font-family: monospace;">if isrlday(15)</span><br style="font-family: monospace;" /><span style="font-family: monospace;"> mpecho This means it is the 15th of the month.</span><br style="font-family: monospace;" /><span style="font-family: monospace;" /><span style="font-family: monospace;">endif</span><br /><h3><a name="isseason">isseason</a></h3>
       <p>Usage:</p>
       <pre>isseason(seasonname)<br /></pre>
       <p>This function is used to
@@ -4755,7 +4844,7 @@ for "CLEAR". Other valid weathernames include: "CLOUDY", "WINDY",
       isyear(integer)<br /><p>This function is used to
 check the mud year.&nbsp;</p>
       <p>EXAMPLE:</p>
-      <span style="font-family: monospace;">if isyear(1)</span><br style="font-family: monospace;" /><span style="font-family: monospace;"> mpecho It is year 1.</span><br style="font-family: monospace;" /><span style="font-family: monospace;"></span><span style="font-family: monospace;">endif</span>
+      <span style="font-family: monospace;">if isyear(1)</span><br style="font-family: monospace;" /><span style="font-family: monospace;"> mpecho It is year 1.</span><br style="font-family: monospace;" /><span style="font-family: monospace;" /><span style="font-family: monospace;">endif</span>
       <h3><a name="level">level</a></h3>
       <p>Usage:</p>
       <pre>level(character == number)<br /></pre>

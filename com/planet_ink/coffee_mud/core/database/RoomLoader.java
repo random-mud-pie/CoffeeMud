@@ -145,6 +145,7 @@ public class RoomLoader
 
 		final RoomnumberSet set = CMLib.database().DBReadAreaRoomList(areaName, false);
 		CMLib.map().addArea(A);
+		CMLib.map().registerWorldObjectLoaded(A, null, A);
 		final Map<String,Room> rooms=DBReadRoomData(null,set,false,null,unloadedRooms);
 
 		DBReadRoomExits(null,rooms,false,unloadedRooms);
@@ -256,6 +257,7 @@ public class RoomLoader
 			for(final Pair<Area,String> a : areasLoaded)
 			{
 				a.first.setAreaState(Area.State.ACTIVE);
+				CMLib.map().registerWorldObjectLoaded(a.first, null, a.first);
 			}
 		}
 		catch(final SQLException sqle)
@@ -559,9 +561,27 @@ public class RoomLoader
 						if(x>0)
 						{
 							otherA=CMLib.map().getArea(nextRoomID.substring(0,x));
-							if((otherA!=null)&&(otherA!=thisRoom.getArea()))
-								newRoom=otherA.getRoom(nextRoomID);
+							if(otherA!=null)
+							{
+								if(otherA!=thisRoom.getArea())
+									newRoom=otherA.getRoom(nextRoomID);
+							}
 						}
+						else
+						{
+							for(final Enumeration<Area> a=CMLib.map().areas();a.hasMoreElements();)
+							{
+								final Area A=a.nextElement();
+								if((A!=null)
+								&&(A.getProperRoomnumbers().contains(nextRoomID)))
+								{
+									otherA=A;
+									if(!CMath.bset(A.flags(), Area.FLAG_THIN))
+										newRoom=otherA.getRoom(nextRoomID);
+								}
+							}
+						}
+
 						if(newRoom!=null)
 						{
 							/* its all worked out now */
@@ -579,7 +599,7 @@ public class RoomLoader
 						}
 						else
 						if(!nextRoomID.startsWith("#"))
-							Log.errOut("RoomLoader","Unknown unlinked room #"+nextRoomID);
+							Log.errOut("RoomLoader","Unknown unlinked room #"+nextRoomID+" in "+roomID);
 						else
 						if(newExit!=null)
 							newExit.setTemporaryDoorLink(nextRoomID);
@@ -667,6 +687,7 @@ public class RoomLoader
 			A.setName(areaName);
 			DBCreate(A);
 			CMLib.map().addArea(A);
+			CMLib.map().registerWorldObjectLoaded(A, null, A);
 			for(final Map.Entry<String,Room> entry : rooms.entrySet())
 			{
 				final Room R=entry.getValue();
@@ -1722,7 +1743,8 @@ public class RoomLoader
 		+"CMTECH="+A.getThemeCode()+" "
 		+"WHERE CMAREA='"+areaID+"'",
 		new String[]{A.description()+" ",A.text()+" "});
-		if(Log.debugChannelOn()&&(CMSecurity.isDebugging(CMSecurity.DbgFlag.CMAREA)||CMSecurity.isDebugging(CMSecurity.DbgFlag.DBROOMS)))
+		if(Log.debugChannelOn()
+		&&(CMSecurity.isDebugging(CMSecurity.DbgFlag.CMAREA)||CMSecurity.isDebugging(CMSecurity.DbgFlag.DBROOMS)))
 			Log.debugOut("RoomLoader","Done updating area "+A.name());
 	}
 

@@ -15,6 +15,7 @@ import com.planet_ink.coffee_mud.CharClasses.interfaces.*;
 import com.planet_ink.coffee_mud.Commands.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.Faction.FData;
+import com.planet_ink.coffee_mud.Common.interfaces.PlayerStats.PlayerCombatStat;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.Basic.StdItem;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
@@ -330,7 +331,10 @@ public class StdMOB implements MOB
 	public void setExperience(final int newVal)
 	{
 		if((newVal > experience) && (this.playerStats()!=null))
+		{
+			this.playerStats().bumpLevelCombatStat(PlayerCombatStat.EXPERIENCE_TOTAL, basePhyStats().level(), newVal-experience);
 			this.playerStats().setLastXPAwardMillis(System.currentTimeMillis());
+		}
 		experience = newVal;
 	}
 
@@ -1451,6 +1455,8 @@ public class StdMOB implements MOB
 	{
 		if (!(victim instanceof MOB))
 		{
+			if(CMLib.flags().isUnattackable(victim))
+				return false;
 			if(victim instanceof Rideable)
 				return CMLib.combat().mayIAttackThisVessel(this, victim);
 			return false;
@@ -2058,6 +2064,18 @@ public class StdMOB implements MOB
 			final int metaFlags = cmd.metaFlags;
 			try
 			{
+				// record an action taken in personal combat stats
+				final MOB combatant = victim;
+				if((cmd.actionCost>0)
+				&&(combatant!=null))
+				{
+					if(playerStats!=null)
+						playerStats.bumpLevelCombatStat(PlayerCombatStat.ACTIONS_DONE, basePhyStats().level(), 1);
+					if(combatant.playerStats()!=null)
+						combatant.playerStats().bumpLevelCombatStat(PlayerCombatStat.ACTIONS_TAKEN, combatant.basePhyStats().level(), 1);
+				}
+
+				// actually do the command queued up
 				if (O instanceof Command)
 				{
 					if (!((Command) O).preExecute(this, commands, metaFlags, secondsElapsed, -diff))
@@ -2503,11 +2521,14 @@ public class StdMOB implements MOB
 				case CMMsg.TYP_PULL:
 				case CMMsg.TYP_PUSH:
 				{
-					if((msg.target() instanceof Physical)
-					&&((maxCarry()*10)<((Physical)msg.target()).phyStats().weight()))
+					if(msg.target() instanceof Physical)
 					{
-						tell(L("That's way too heavy."));
-						return false;
+						final int totalWeight=CMLib.utensils().getPullWeight((Physical)msg.target());
+						if((maxCarry()*10)<totalWeight)
+						{
+							tell(L("That's way too heavy."));
+							return false;
+						}
 					}
 					final int movesReq = ((msg.targetMinor()==CMMsg.TYP_PUSH)?
 						((Physical)msg.target()).phyStats().movesReqToPush():
@@ -3797,12 +3818,20 @@ public class StdMOB implements MOB
 						tickStatus = Tickable.STATUS_FIGHT;
 						if((!isMonster) && isAttributeSet(MOB.Attrib.NOBATTLESPAM) && (peaceTime>0))
 							tell(L("^F^<FIGHT^>You are now in combat.^</FIGHT^>^N"));
-						peaceTime = 0;
 						if(CMLib.flags().canAutoAttack(this))
 							CMLib.combat().tickCombat(this);
 
 						if(!isMonster)
+						{
+							if(playerStats()!=null)
+							{
+								if(peaceTime > 0)
+									playerStats().bumpLevelCombatStat(PlayerCombatStat.COMBATS_TOTAL, basePhyStats().level(), 1);
+								playerStats().bumpLevelCombatStat(PlayerCombatStat.ROUNDS_TOTAL, basePhyStats().level(), 1);
+							}
 							CMLib.combat().handleDamageSpamSummary(this);
+						}
+						peaceTime = 0;
 					}
 					else
 					{
@@ -4899,7 +4928,8 @@ public class StdMOB implements MOB
 	@Override
 	public void delBehavior(final Behavior to)
 	{
-		behaviors.removeElement(to);
+		if(behaviors.removeElement(to))
+			to.endBehavior(this);
 	}
 
 	@Override
@@ -4959,7 +4989,11 @@ public class StdMOB implements MOB
 	@Override
 	public int[][] getAbilityUsageCache(final String abilityID)
 	{
-		int[][] ableCache=abilityUseCache.get(abilityID);
+		int[][] ableCache;
+		synchronized(abilityUseCache)
+		{
+			ableCache=abilityUseCache.get(abilityID);
+		}
 		if(ableCache==null)
 		{
 			ableCache=new int[Ability.CACHEINDEX_TOTAL][];
@@ -4967,14 +5001,19 @@ public class StdMOB implements MOB
 		}
 		final CharStats charStats = charStats();
 		final CharClass charClass=charStats.getCurrentClass();
-		if((phyStats().level()!=abilityUseTrig[0])
-		||(charStats.getCurrentClassLevel()!=abilityUseTrig[1])
-		||(charClass.hashCode()!=abilityUseTrig[2]))
+		final int[] ableUseTrig;
+		synchronized(abilityUseTrig)
+		{
+			ableUseTrig = this.abilityUseTrig;
+		}
+		if((phyStats().level()!=ableUseTrig[0])
+		||(charStats.getCurrentClassLevel()!=ableUseTrig[1])
+		||(charClass.hashCode()!=ableUseTrig[2]))
 		{
 			clearAbilityUsageCache();
-			abilityUseTrig[0]=phyStats().level();
-			abilityUseTrig[1]=charStats.getCurrentClassLevel();
-			abilityUseTrig[2]=charClass.hashCode();
+			ableUseTrig[0]=phyStats().level();
+			ableUseTrig[1]=charStats.getCurrentClassLevel();
+			ableUseTrig[2]=charClass.hashCode();
 		}
 		return ableCache;
 	}
@@ -5314,7 +5353,11 @@ public class StdMOB implements MOB
 		int x = getWearPositions(wornCode);
 		if (x <= 0)
 			return 0;
-		x -= fetchWornItems(wornCode, belowLayer, layerAttributes).size();
+		final int maxItemsEver = CMProps.getIntVar(CMProps.Int.MAXITEMSWORN);
+		final List<Item> allItems=fetchWornItems(Long.MIN_VALUE, belowLayer, layerAttributes);
+		if((maxItemsEver > 0) && (allItems.size()>=maxItemsEver))
+			return 0;
+		x -= counItemsWornAt(allItems, wornCode);
 		if (x <= 0)
 			return 0;
 		return x;
@@ -5325,8 +5368,9 @@ public class StdMOB implements MOB
 	{
 		if ((charStats().getWearableRestrictionsBitmap() & wornCode) > 0)
 			return 0;
+		final int maxPerSlot = CMProps.getIntVar(CMProps.Int.MAXWEARPERLOC);
 		if (wornCode == Wearable.WORN_FLOATING_NEARBY)
-			return 6;
+			return (maxPerSlot == 0) ? 6 : maxPerSlot;
 		int total;
 		int add = 0;
 		boolean found = false;
@@ -5392,13 +5436,26 @@ public class StdMOB implements MOB
 		}
 		if (!found)
 			return 1;
+		if((add > maxPerSlot) && (maxPerSlot > 0))
+			return maxPerSlot;
 		return add;
+	}
+
+	protected int counItemsWornAt(final List<Item> items, final long wornCode)
+	{
+		int ct=0;
+		for (final Item thisItem : items)
+		{
+			if (thisItem.amWearingAt(wornCode))
+				ct++;
+		}
+		return ct;
 	}
 
 	@Override
 	public List<Item> fetchWornItems(final long wornCode, final short aboveOrAroundLayer, final short layerAttributes)
 	{
-		final Vector<Item> V = new Vector<Item>();
+		final Vector<Item> V = new Vector<Item>(); // return value
 		final boolean equalOk = (layerAttributes & Armor.LAYERMASK_MULTIWEAR) > 0;
 		final boolean allWorn = wornCode == Long.MIN_VALUE;
 		int lay = 0;

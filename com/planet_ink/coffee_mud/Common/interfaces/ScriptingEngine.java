@@ -672,10 +672,19 @@ public interface ScriptingEngine extends CMCommon, Tickable, MsgListener
 		"MPRPEXP", //86
 		"MEA", //87
 		"MER", //88
+		"MPCASTEXT", //89
+		"MPLINK", //90
+		"MPUNLINK", //91
+		"MPPUT", //92
+		"ENDIF", //93 JUST for catching errors...
+		"ENDSWITCH", //94 JUST for catching errors...
+		"NEXT", //95 JUST for catching errors...
+		"CASE", //96 JUST for catching errors...
+		"DEFAULT" //97 JUST for catching errors...
 	};
 
 	/** a list of some some extra stat codes for mobs*/
-	public final static String[] GSTATCODES_ADDITIONAL={"DEITY","CLAN","CLANROLE","STINK"};
+	public final static String[] GSTATCODES_ADDITIONAL={"DEITY","CLAN","CLANROLE","STINK","MATTRIB"};
 	/** index and equate for stat code for mob: deity*/
 	public final static int GSTATADD_DEITY=0;
 	/** index and equate for stat code for mob: clan */
@@ -684,6 +693,8 @@ public interface ScriptingEngine extends CMCommon, Tickable, MsgListener
 	public final static int GSTATADD_CLANROLE=2;
 	/** index and equate for stat code for mob: hygiene */
 	public final static int GSTATADD_STINK=3;
+	/** index and equate for stat code for mob: attrib */
+	public final static int GSTATADD_MATTRIB=4;
 
 	/** a list of the different parts of a time clock */
 	public final static String[] DATETIME_ARGS={"HOUR","TIME","DAY","DATE","MONTH","YEAR"};

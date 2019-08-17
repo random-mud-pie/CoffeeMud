@@ -2,6 +2,7 @@ package com.planet_ink.coffee_mud.Abilities.Common;
 import com.planet_ink.coffee_mud.core.interfaces.*;
 import com.planet_ink.coffee_mud.core.*;
 import com.planet_ink.coffee_mud.core.collections.*;
+import com.planet_ink.coffee_mud.Abilities.ThinAbility;
 import com.planet_ink.coffee_mud.Abilities.interfaces.*;
 import com.planet_ink.coffee_mud.Areas.interfaces.*;
 import com.planet_ink.coffee_mud.Behaviors.interfaces.*;
@@ -11,6 +12,7 @@ import com.planet_ink.coffee_mud.Common.interfaces.*;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
 import com.planet_ink.coffee_mud.Libraries.interfaces.ColorLibrary;
+import com.planet_ink.coffee_mud.Libraries.interfaces.XMLLibrary;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
@@ -32,7 +34,7 @@ import java.util.*;
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-public class Dyeing extends CommonSkill
+public class Dyeing extends PaintingSkill
 {
 	@Override
 	public String ID()
@@ -61,15 +63,6 @@ public class Dyeing extends CommonSkill
 		return triggerStrings;
 	}
 
-	// common recipe definition indexes
-	protected static final int	RCP_FINALNAME	= 0;
-	protected static final int	RCP_LEVEL		= 1;
-	protected static final int	RCP_FREQ		= 2;
-	protected static final int	RCP_COLOR		= 3;
-
-	protected Item found=null;
-	protected String writing="";
-
 	@Override
 	protected boolean canBeDoneSittingDown()
 	{
@@ -83,43 +76,16 @@ public class Dyeing extends CommonSkill
 		verb=L("dyeing");
 	}
 
-	protected String fixColor(String name, final char colorChar, final String colorWord)
+	@Override
+	protected int canAffectCode()
 	{
-		final int end=name.indexOf("^?");
-		if((end>0)&&(end<=name.length()-3))
-		{
-			final int start=name.substring(0,end).indexOf('^');
-			if((start>=0)&&(start<(end-3)))
-			{
-				name=name.substring(0,start)
-					 +name.substring(end+3);
-			}
-		}
-		final Vector<String> V=CMParms.parse(name);
-		for(int v=0;v<V.size();v++)
-		{
-			final String word=V.elementAt(v);
-			if((word.equalsIgnoreCase("an")) || (word.equalsIgnoreCase("a")))
-			{
-				final String properPrefix=CMLib.english().properIndefiniteArticle(colorWord);
-				V.insertElementAt(colorWord,v+1);
-				if(word.toLowerCase().equals(word))
-					V.set(v,properPrefix.toLowerCase());
-				else
-					V.set(v,CMStrings.capitalizeAndLower(properPrefix));
-				return CMParms.combine(V,0);
-			}
-			else
-			if((word.equalsIgnoreCase("of"))
-			||(word.equalsIgnoreCase("some"))
-			||(word.equalsIgnoreCase("the")))
-			{
-				V.insertElementAt(colorWord,v+1);
-				return CMParms.combine(V,0);
-			}
-		}
-		V.insertElementAt(colorWord,0);
-		return CMParms.combine(V,0);
+		return Ability.CAN_MOBS;
+	}
+
+	@Override
+	protected int canTargetCode()
+	{
+		return Ability.CAN_ITEMS;
 	}
 
 	@Override
@@ -129,6 +95,7 @@ public class Dyeing extends CommonSkill
 		{
 			if((affected!=null)
 			&&(affected instanceof MOB)
+			&&(found!=null)
 			&&(!aborted)
 			&&(!helping))
 			{
@@ -137,39 +104,9 @@ public class Dyeing extends CommonSkill
 					commonEmote(mob,L("<S-NAME> mess(es) up the dyeing."));
 				else
 				{
-					char colorCode='^';
-					for(int i=0;i<writing.length();i++)
-					{
-						if((writing.charAt(i)=='^')
-						&&(i<writing.length()-1)
-						&&(writing.charAt(i+1)!='?')
-						&&(writing.charAt(i+1)!=ColorLibrary.COLORCODE_BACKGROUND)
-						&&(writing.charAt(i+1)!=ColorLibrary.COLORCODE_FANSI256)
-						&&(writing.charAt(i+1)!=ColorLibrary.COLORCODE_BANSI256))
-						{
-							colorCode=writing.charAt(i+1);
-							break;
-						}
-					}
-					final StringBuffer desc=new StringBuffer(found.description());
-					for(int x=0;x<(desc.length()-1);x++)
-					{
-						if((desc.charAt(x)=='^')
-						&&(desc.charAt(x+1)!='?')
-						&&(desc.charAt(x+1)!=ColorLibrary.COLORCODE_BACKGROUND)
-						&&(desc.charAt(x+1)!=ColorLibrary.COLORCODE_FANSI256)
-						&&(desc.charAt(x+1)!=ColorLibrary.COLORCODE_BANSI256))
-							desc.setCharAt(x+1, colorCode);
-					}
-					final String d=desc.toString();
-					if(!d.endsWith("^?"))
-						desc.append("^?");
-					if(!d.startsWith("^"+colorCode))
-						desc.insert(0,"^"+colorCode);
-					found.setDescription(desc.toString());
-					found.setName(fixColor(found.Name(), colorCode, writing));
-					found.setDisplayText(fixColor(found.displayText(), colorCode, writing));
-					found.text();
+					removePaintJob(found);
+					if(!writing.equalsIgnoreCase("remove"))
+						this.addPaintJob(found, writing);
 				}
 			}
 		}
@@ -177,11 +114,17 @@ public class Dyeing extends CommonSkill
 	}
 
 	@Override
+	protected String getRecipeFile()
+	{
+		return "dyeing.txt";
+	}
+
+	@Override
 	public boolean invoke(final MOB mob, final List<String> commands, final Physical givenTarget, final boolean auto, final int asLevel)
 	{
 		if(super.checkStop(mob, commands))
 			return true;
-		final List<List<String>> recipes = addRecipes(mob,super.loadRecipes("dyeing.txt"));
+		final List<List<String>> recipes = addRecipes(mob,super.loadRecipes(getRecipeFile()));
 		writing=CMParms.combine(commands,0).toLowerCase();
 		List<String> finalRecipe = null;
 		if(writing.equalsIgnoreCase("list"))
@@ -189,17 +132,19 @@ public class Dyeing extends CommonSkill
 			final StringBuilder colors=new StringBuilder(L("^NColors you can choose: "));
 			for(final List<String> list : recipes)
 			{
-				final String name=list.get(0);
-				final int level=CMath.s_int(list.get(1));
-				if(level <= adjustedLevel(mob,asLevel))
-					colors.append(name).append(", ");
+				final String name=list.get(RCP_COLOR);
+				final int level=CMath.s_int(list.get(RCP_LEVEL));
+				final int exp=CMath.s_int(list.get(RCP_EXPERTISE));
+				if((level <= adjustedLevel(mob,asLevel))
+				&&((exp<=super.getXLEVELLevel(mob))))
+					colors.append(name).append("^N, ");
 			}
-			commonTell(mob,colors.substring(0,colors.length()-2)+".\n\r");
+			commonTell(mob,colors.substring(0,colors.length()-2)+"^N.\n\r");
 			return false;
 		}
 		if(commands.size()<2)
 		{
-			commonTell(mob,L("You must specify what you want to dye, and color to dye it."));
+			commonTell(mob,L("You must specify what you want to dye, and color to dye it or the word remove, or specify LIST."));
 			return false;
 		}
 		final Item target=mob.fetchItem(null,Wearable.FILTER_UNWORNONLY,commands.get(0));
@@ -225,31 +170,49 @@ public class Dyeing extends CommonSkill
 		{
 			final String name=list.get(0);
 			final int level=CMath.s_int(list.get(1));
+			final int exp=CMath.s_int(list.get(RCP_EXPERTISE));
 			if(name.equalsIgnoreCase(writing)
-			&&(level<=adjustedLevel(mob,asLevel)))
+			&&(level<=adjustedLevel(mob,asLevel))
+			&&((exp<=super.getXLEVELLevel(mob))))
 			{
 				finalRecipe=list;
 				break;
 			}
 		}
-		if(finalRecipe == null)
+		if((finalRecipe == null) && (!writing.equalsIgnoreCase("remove")))
 		{
-			commonTell(mob,L("You can't dye anything '@x1'. Try DYEING LIST for a list.",writing));
+			commonTell(mob,L("You can't dye anything '@x1'. Try DYEING LIST for a list or use REMOVE as the color.",writing));
 			return false;
 		}
 		if(!super.invoke(mob,commands,givenTarget,auto,asLevel))
 			return false;
-		writing = finalRecipe.get(RCP_COLOR);
-		verb=L("dyeing @x1 @x2",target.name(),writing);
+		String startMsg;
+		if(writing.equalsIgnoreCase("remove"))
+		{
+			writing =  "remove";
+			verb=L("removing the color from @x1",target.name());
+			startMsg=L("<S-NAME> start(s) un-dyeing @x1.",target.name());
+		}
+		else
+		if(finalRecipe != null)
+		{
+			writing =  finalRecipe.get(RCP_COLOR);
+			verb=L("dyeing @x1 @x2",target.name(),writing);
+			startMsg=L("<S-NAME> start(s) dyeing @x1.",target.name());
+		}
+		else
+			startMsg=L("<S-NAME> start(s) dyeing @x1.",target.name());
 		displayText=L("You are @x1",verb);
 		found=target;
 		if(!proficiencyCheck(mob,0,auto))
 			writing="";
 		int duration=30;
+		if(finalRecipe != null)
+			duration=CMath.s_int(finalRecipe.get(RCP_TICKS));
 		if((target.material()&RawMaterial.MATERIAL_MASK)==RawMaterial.MATERIAL_LEATHER)
 			duration*=2;
 		duration=getDuration(duration,mob,1,6);
-		final CMMsg msg=CMClass.getMsg(mob,null,this,getActivityMessageType(),L("<S-NAME> start(s) dyeing @x1.",target.name()));
+		final CMMsg msg=CMClass.getMsg(mob,null,this,getActivityMessageType(),startMsg);
 		if(mob.location().okMessage(mob,msg))
 		{
 			mob.location().send(mob,msg);

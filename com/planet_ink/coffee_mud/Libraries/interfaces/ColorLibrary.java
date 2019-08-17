@@ -10,6 +10,7 @@ import com.planet_ink.coffee_mud.Commands.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.*;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
+import com.planet_ink.coffee_mud.Libraries.interfaces.ColorLibrary.Color;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
@@ -314,6 +315,62 @@ public interface ColorLibrary extends CMLibrary
 	}
 
 	/**
+	 * The object with information about all
+	 * supported ANSI-256 colors
+	 *
+	 * @author BZ
+	 *
+	 */
+	public interface Color256
+	{
+		/**
+		 * @return the number
+		 */
+		public short getNumber();
+
+		/**
+		 * @return the name1
+		 */
+		public String getName1();
+
+		/**
+		 * @return the name2
+		 */
+		public String getName2();
+
+		/**
+		 * @return the non256color
+		 */
+		public Color getNon256color();
+
+		/**
+		 * @return the htmlCode
+		 */
+		public String getHtmlCode();
+
+		/**
+		 * @return the expertiseNum
+		 */
+		public short getExpertiseNum();
+
+		/**
+		 * @return the cm6Code
+		 */
+		public short getCm6Code();
+
+		/**
+		 * @return the cmChars
+		 */
+		public String getCmChars();
+
+		/**
+		 * @param non256color the non256color to set
+		 */
+		public void setNon256color(Color non256color);
+
+	}
+
+	/**
 	 * Clears the color code lookup tables so that the next
 	 * translations will come from the properties.
 	 */
@@ -385,6 +442,40 @@ public interface ColorLibrary extends CMLibrary
 	 * @return the ansi escape color lookup table
 	 */
 	public String[] standardColorLookups();
+
+	/**
+	 * Returns a friendly readable chart of colors,
+	 * formatted for 80 columns.
+	 *
+	 * @param doAll256 true to send all 256, false for 16
+	 * @return the friendly help
+	 */
+	public String getColorInfo(final boolean doAll256);
+
+	/**
+	 * Returns the ANSI 16 color equivalent to the given
+	 * CM-encoded ANSI 256 color.  This is for users who lack 256 color
+	 * support.
+	 * @param color256Code the CM-encoded 256 color number
+	 * @return the ANSI-16 Color object, or null.
+	 */
+	public Color getANSI16Equivalent(final short color256Code);
+
+	/**
+	 * Returns an enumeration of the supported ansi-256 colors
+	 * that are supported by the system in general.
+	 */
+	public Enumeration<Color256> getColors256();
+
+	/**
+	 * Translates encoded color definition overrides into a
+	 * completed color mapping, where mappings are from char
+	 * code ints to either escape strings, or more defs.
+	 * Returns a mapping
+	 * @param colorDefs the encoded colorDef to translate
+	 * @return the map of codes to colors
+	 */
+	public String[] fixPlayerColorDefs(final String colorDefs);
 
 	/**
 	 * Generates a new ColorState object from the given

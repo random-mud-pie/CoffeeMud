@@ -766,6 +766,7 @@ public class StdBanker extends StdShopKeeper implements Banker
 							else
 							{
 								CMLib.commands().postSay(this,mob,L("Whoops! Where'd it go?"),true,false);
+								super.executeMsg(myHost, msg);
 								return;
 							}
 						}
@@ -773,6 +774,12 @@ public class StdBanker extends StdShopKeeper implements Banker
 						((Item)msg.tool()).destroy();
 					}
 				}
+				if ((CMSecurity.isAllowed(msg.source(), location(), CMSecurity.SecFlag.ORDER)
+				|| (CMLib.law().doesHavePriviledgesHere(msg.source(), getStartRoom()))
+				|| (CMSecurity.isAllowed(msg.source(), location(), CMSecurity.SecFlag.CMDMOBS) && (isMonster()))
+				|| (CMSecurity.isAllowed(msg.source(), location(), CMSecurity.SecFlag.CMDROOMS) && (isMonster()))))
+					return;
+				super.executeMsg(myHost, msg);
 				return;
 			case CMMsg.TYP_BORROW:
 				if(CMLib.flags().isAliveAwakeMobileUnbound(mob,true))
@@ -854,6 +861,7 @@ public class StdBanker extends StdShopKeeper implements Banker
 									CMLib.commands().postSay(this,mob,L("I have closed the account for @x1. Thanks for your business.",CMStrings.capitalizeFirstLetter(withdrawerName)),true,false);
 								else
 									CMLib.commands().postSay(this,mob,L("I have closed that account. Thanks for your business."),true,false);
+								super.executeMsg(myHost, msg);
 								return;
 							}
 							addDepositInventory(withdrawerName,coins,null);
@@ -897,6 +905,7 @@ public class StdBanker extends StdShopKeeper implements Banker
 					}
 
 				}
+				super.executeMsg(myHost, msg);
 				return;
 			case CMMsg.TYP_VALUE:
 			case CMMsg.TYP_SELL:
@@ -1051,7 +1060,15 @@ public class StdBanker extends StdShopKeeper implements Banker
 							CMLib.commands().postSay(this,mob,L("I'm sorry, this bank only deals in @x1.",CMLib.beanCounter().getDenominationName(CMLib.beanCounter().getCurrency(this))),true,false);
 							return false;
 						}
-						return true;
+						return super.okMessage(myHost, msg);
+					}
+					else
+					{
+						if(getItemInterest()>0.5)
+						{
+							CMLib.commands().postSay(this,mob,L("I'm sorry, I don't have any deposit boxes to hold items like that."),true,false);
+							return false;
+						}
 					}
 					if(!(msg.tool() instanceof Item))
 					{
@@ -1075,7 +1092,7 @@ public class StdBanker extends StdShopKeeper implements Banker
 						return false;
 					}
 				}
-				return true;
+				return super.okMessage(myHost, msg);
 			case CMMsg.TYP_WITHDRAW:
 				{
 					if(!CMLib.coffeeShops().ignoreIfNecessary(msg.source(),finalIgnoreMask(),this))
@@ -1154,7 +1171,7 @@ public class StdBanker extends StdShopKeeper implements Banker
 							return false;
 						}
 						if(minbalance==0)
-							return true;
+							return super.okMessage(myHost, msg);
 						if(((Coins)msg.tool()).getTotalValue()>(balance-minbalance))
 						{
 							if((balance-minbalance)>0)
@@ -1165,7 +1182,7 @@ public class StdBanker extends StdShopKeeper implements Banker
 						}
 					}
 				}
-				return true;
+				return super.okMessage(myHost, msg);
 			case CMMsg.TYP_VALUE:
 			case CMMsg.TYP_SELL:
 			case CMMsg.TYP_VIEW:
@@ -1179,6 +1196,11 @@ public class StdBanker extends StdShopKeeper implements Banker
 				if(!(msg.tool() instanceof Coins))
 				{
 					CMLib.commands().postSay(this,mob,L("I'm sorry, only MONEY can be borrowed."),true,false);
+					return false;
+				}
+				if(getLoanInterest()<-0.5)
+				{
+					CMLib.commands().postSay(this,mob,L("I'm sorry, I don't loan money."),true,false);
 					return false;
 				}
 				final String withdrawerName=getBankClientName(msg.source(),Clan.Function.WITHDRAW,true);
@@ -1220,7 +1242,7 @@ public class StdBanker extends StdShopKeeper implements Banker
 					CMLib.commands().postSay(this,mob,str.toString()+"^T",true,false);
 					return false;
 				}
-				return true;
+				return super.okMessage(myHost, msg);
 			}
 			case CMMsg.TYP_LIST:
 			{

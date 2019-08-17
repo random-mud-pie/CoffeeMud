@@ -8,10 +8,12 @@ import com.planet_ink.coffee_mud.Behaviors.interfaces.*;
 import com.planet_ink.coffee_mud.CharClasses.interfaces.*;
 import com.planet_ink.coffee_mud.Commands.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.*;
+import com.planet_ink.coffee_mud.Common.interfaces.Faction.FRange;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
 import com.planet_ink.coffee_mud.Libraries.interfaces.ExpertiseLibrary;
 import com.planet_ink.coffee_mud.Libraries.interfaces.LegalLibrary;
+import com.planet_ink.coffee_mud.Libraries.interfaces.TimeManager;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
@@ -86,6 +88,8 @@ public class Spell_Wish extends Spell
 		return Ability.COST_ALL;
 	}
 
+	protected volatile long lastCastTime = 0;
+
 	protected Physical maybeAdd(final MOB mob, final Physical E, final List<Physical> foundAll, Physical foundThang)
 	{
 		final Room R=CMLib.map().roomLocation(E);
@@ -103,31 +107,38 @@ public class Spell_Wish extends Spell
 		return foundThang;
 	}
 
-	private void bringThangHere(final MOB mob, final Room here, final Physical target)
+	private double bringThangHere(final MOB mob, final Room newRoom, final Physical target)
 	{
+		double factor = 1.0;
 		if(target instanceof MOB)
 		{
-			mob.location().show((MOB)target,null,CMMsg.MSG_OK_VISUAL,L("<S-NAME> teleport(s) to @x1.",here.displayText()));
-			here.bringMobHere((MOB)target,false);
-			if(here.isInhabitant((MOB)target))
-				here.show((MOB)target,null,CMMsg.MSG_OK_VISUAL,L("<S-NAME> appear(s) out of nowhere."));
+			final Room thisRoom=mob.location();
+			final CMMsg enterMsg=CMClass.getMsg(mob,newRoom,this,CMMsg.MSG_ENTER,null,CMMsg.MSG_ENTER,null,CMMsg.MSG_ENTER,null);
+			final CMMsg leaveMsg=CMClass.getMsg(mob,thisRoom,this,CMMsg.MSG_LEAVE|CMMsg.MASK_MAGIC,null);
+			if(!thisRoom.okMessage(mob,leaveMsg)||!newRoom.okMessage(mob,enterMsg))
+				factor=40.0;
+			mob.location().show((MOB)target,null,CMMsg.MSG_OK_VISUAL,L("<S-NAME> teleport(s) to @x1.",newRoom.displayText()));
+			newRoom.bringMobHere((MOB)target,false);
+			if(newRoom.isInhabitant((MOB)target))
+				newRoom.show((MOB)target,null,CMMsg.MSG_OK_VISUAL,L("<S-NAME> appear(s) out of nowhere."));
 		}
 		else
 		if(target instanceof Item)
 		{
 			final Item item=(Item)target;
-			mob.location().show(mob,target,CMMsg.MSG_OK_VISUAL,L("<T-NAME> is teleported to @x1!",here.displayText()));
+			mob.location().show(mob,target,CMMsg.MSG_OK_VISUAL,L("<T-NAME> is teleported to @x1!",newRoom.displayText()));
 			item.unWear();
 			item.setContainer(null);
 			item.removeFromOwnerContainer();
-			here.addItem(item,ItemPossessor.Expire.Player_Drop);
+			newRoom.addItem(item,ItemPossessor.Expire.Player_Drop);
 			mob.location().show(mob,target,CMMsg.MSG_OK_VISUAL,L("<T-NAME> appears out of the Java Plane!"));
 		}
+		return factor;
 	}
 
 	public void wishDrain(final MOB mob, int expLoss, final boolean conLoss)
 	{
-		if(mob==null)
+		if((mob==null) || (CMSecurity.isASysOp(mob)))
 			return;
 		expLoss=getXPCOSTAdjustment(mob,expLoss);
 		if(expLoss > mob.getExperience())
@@ -180,6 +191,13 @@ public class Spell_Wish extends Spell
 			return false;
 		}
 
+		if((System.currentTimeMillis() < (lastCastTime + TimeManager.MILI_DAY))
+		&&(!CMSecurity.isASysOp(mob)))
+		{
+			mob.tell(L("You are too wish-weary to cast this right now."));
+			return false;
+		}
+
 		if(!super.invoke(mob,commands,givenTarget,auto,asLevel))
 			return false;
 
@@ -196,12 +214,10 @@ public class Spell_Wish extends Spell
 		else
 		if(mob.location().okMessage(mob,msg))
 		{
-			// cast wish bless were cast on me
-			// cast wish to have restoration cast on me
-			// cast wish to cast bless on me
 			// cast wish to cast disintegrate on orc
 			// cast wish to cast geas on orc to kill bob
 			Log.sysOut("Wish",mob.Name()+" wished for "+myWish+".");
+			lastCastTime = System.currentTimeMillis();
 
 			mob.location().send(mob,msg);
 			final StringBuffer wish=new StringBuffer(myWish);
@@ -592,8 +608,8 @@ public class Spell_Wish extends Spell
 					recallRoom=((MOB)target).getStartRoom();
 				if(recallRoom!=null)
 				{
+					baseLoss *= bringThangHere(mob,recallRoom,target);
 					wishDrain(mob,baseLoss,false);
-					bringThangHere(mob,recallRoom,target);
 					return true;
 				}
 			}
@@ -747,7 +763,7 @@ public class Spell_Wish extends Spell
 				{
 					if(CMLib.flags().canAccess(mob, newRoom))
 					{
-						bringThangHere(mob,newRoom,target);
+						baseLoss *= bringThangHere(mob,newRoom,target);
 						newRoom.show(mob, null, CMMsg.MSG_OK_VISUAL, L("<S-NAME> appears!"));
 						wishDrain(mob,baseLoss,false);
 						return true;
@@ -1274,6 +1290,52 @@ public class Spell_Wish extends Spell
 				}
 			}
 
+			if(myWish.startsWith(" TO FORGET ")
+			||myWish.startsWith(" TO UNLEARN "))
+			{
+				String possSpell=myWish.substring(6);
+				possSpell=possSpell.substring(possSpell.indexOf(' ')).trim();
+				final Ability A=CMClass.findAbility(possSpell);
+				if(A!=null)
+				{
+					if(target instanceof MOB)
+					{
+						final Ability myA=((MOB)target).fetchAbility(A.ID());
+						if(myA!=null)
+						{
+							((MOB)target).delAbility(myA);
+							final Ability eA=target.fetchEffect(myA.ID());
+							if(eA!=null)
+							{
+								eA.unInvoke();
+								target.delEffect(eA);
+							}
+							mob.location().show(mob,null,CMMsg.MSG_OK_VISUAL,L("@x1 has forgotten @x2!",target.name(),A.name()));
+						}
+					}
+					else
+					{
+						final Ability myA=mob.fetchAbility(A.ID());
+						if(myA!=null)
+						{
+							mob.delAbility(myA);
+							final Ability eA=mob.fetchEffect(myA.ID());
+							if(eA!=null)
+							{
+								eA.unInvoke();
+								mob.delEffect(eA);
+							}
+							mob.location().show(mob,null,CMMsg.MSG_OK_VISUAL,L("@x1 has forgotten @x2!",mob.name(),A.name()));
+						}
+					}
+					baseLoss=getXPCOSTAdjustment(mob,baseLoss);
+					CMLib.leveler().postExperience(mob,null,null,-baseLoss,false);
+					mob.tell(L("Your wish has drained you of @x1 experience points.",""+baseLoss));
+					return false;
+				}
+
+			}
+
 			// gaining new abilities!
 			if(target instanceof MOB)
 			{
@@ -1341,6 +1403,8 @@ public class Spell_Wish extends Spell
 							&&(onFlag)
 							&&(target!=mob)&&(!A.isAutoInvoked()))
 							{
+								baseLoss+=975;
+								wishDrain(mob,baseLoss,false);
 								A.setProficiency(100);
 								A.invoke(mob, target, true, asLevel);
 								A=null;
@@ -1444,6 +1508,85 @@ public class Spell_Wish extends Spell
 							return true;
 						}
 					}
+				}
+
+				if(myWish.endsWith(" WAS CAST ON ME")
+				||myWish.endsWith(" CAST ON ME")
+				||myWish.endsWith(" WAS ON ME")
+				||myWish.endsWith(" ON ME"))
+				{
+					final MOB tm=mob;
+					String spellName=myWish;
+					if(myWish.endsWith(" WAS CAST ON ME"))
+						spellName=myWish.substring(0,myWish.length()-15).trim();
+					else
+					if(myWish.endsWith(" CAST ON ME"))
+						spellName=myWish.substring(0,myWish.length()-11).trim();
+					else
+					if(myWish.endsWith(" WAS ON ME"))
+						spellName=myWish.substring(0,myWish.length()-10).trim();
+					else
+					if(myWish.endsWith(" ON ME"))
+						spellName=myWish.substring(0,myWish.length()-6).trim();
+					final Ability A=CMClass.findAbility(spellName);
+					if((A!=null)
+					&&(CMLib.ableMapper().lowestQualifyingLevel(A.ID())>0)
+					&&((A.classificationCode()&Ability.ALL_DOMAINS)!=Ability.DOMAIN_ARCHON))
+					{
+						if(CMLib.ableMapper().lowestQualifyingLevel(A.ID())>=25)
+						{
+							baseLoss=getXPCOSTAdjustment(mob,baseLoss);
+							CMLib.leveler().postExperience(mob,null,null,-baseLoss,false);
+							mob.tell(L("Your wish has drained you of @x1 experience points, but that is beyond your wishing ability.",""+baseLoss));
+							return false;
+						}
+						if(tm.fetchEffect(A.ID())==null)
+							A.invoke(mob, target, true, 1);
+						baseLoss=getXPCOSTAdjustment(mob,baseLoss);
+						CMLib.leveler().postExperience(mob,null,null,-baseLoss,false);
+						mob.tell(L("Your wish has drained you of @x1 experience points.",""+baseLoss));
+						return false;
+					}
+				}
+			}
+
+
+			final String[] castOnMes = new String[]
+			{
+				" WAS CAST ",
+				" TO BE CAST ",
+				" CAST "
+			};
+			int castOn = -1;
+			for(int x=0;x<castOnMes.length;x++)
+				if(myWish.endsWith(castOnMes[x]))
+				{
+					castOn=x;
+					break;
+				}
+			if((target!=null)
+			&&(castOn>=0))
+			{
+				final MOB tm=(MOB)target;
+				final String spellName=myWish.substring(0,myWish.length()-castOnMes[castOn].length()).trim();
+				final Ability A=CMClass.findAbility(spellName);
+				if((A!=null)
+				&&(CMLib.ableMapper().lowestQualifyingLevel(A.ID())>0)
+				&&((A.classificationCode()&Ability.ALL_DOMAINS)!=Ability.DOMAIN_ARCHON))
+				{
+					if(CMLib.ableMapper().lowestQualifyingLevel(A.ID())>=25)
+					{
+						baseLoss=getXPCOSTAdjustment(mob,baseLoss);
+						CMLib.leveler().postExperience(mob,null,null,-baseLoss,false);
+						mob.tell(L("Your wish has drained you of @x1 experience points, but that is beyond your wishing ability.",""+baseLoss));
+						return false;
+					}
+					if(tm.fetchEffect(A.ID())==null)
+						A.invoke(mob, target, true, 1);
+					baseLoss=getXPCOSTAdjustment(mob,baseLoss);
+					CMLib.leveler().postExperience(mob,null,null,-baseLoss,false);
+					mob.tell(L("Your wish has drained you of @x1 experience points.",""+baseLoss));
+					return false;
 				}
 			}
 
@@ -1604,7 +1747,6 @@ public class Spell_Wish extends Spell
 			{
 				if(foundAttribute>1000)
 				{
-
 					switch(foundAttribute)
 					{
 					case 1001:
@@ -1671,6 +1813,123 @@ public class Spell_Wish extends Spell
 				return true;
 			}
 
+			// possibly a faction change
+			if((target instanceof MOB)
+			&&((myWish.indexOf(" BECOME ")>=0)
+			||(myWish.indexOf(" TO BE ")>=0)
+			||(myWish.indexOf(" BE MORE")>=0)))
+			{
+				final MOB tmob=(MOB)target;
+				String factionID=null;
+				int rangeChange=-1;
+				for(final Enumeration<Faction> f=CMLib.factions().factions();f.hasMoreElements();)
+				{
+					final Faction F=f.nextElement();
+					if(F.isPreLoaded())
+					{
+						for(final Enumeration<FRange> gr=F.ranges();gr.hasMoreElements();)
+						{
+							final FRange FR=gr.nextElement();
+							if(myWish.endsWith(FR.name().toUpperCase()))
+							{
+								factionID=F.factionID();
+								rangeChange=FR.random();
+								break;
+							}
+						}
+					}
+				}
+				int inx=myWish.indexOf(" IN ");
+				if(inx<0)
+					inx=myWish.indexOf(" WITH ");
+				if(inx>0)
+				{
+					final String prev=" "+myWish.substring(0,inx).trim().toUpperCase()+" ";
+					inx++;
+					inx=myWish.indexOf(" ",inx+1);
+					final String where=myWish.substring(inx+1).trim().toUpperCase();
+					for(final Enumeration<Faction> f=CMLib.factions().factions();f.hasMoreElements();)
+					{
+						final Faction F=f.nextElement();
+						if(F.name().toUpperCase().indexOf(where)>=0)
+						{
+							for(final Enumeration<FRange> gr=F.ranges();gr.hasMoreElements();)
+							{
+								final FRange FR=gr.nextElement();
+								if(prev.indexOf(" "+FR.name().toUpperCase()+" ")>=0)
+								{
+									factionID=F.factionID();
+									rangeChange=FR.random();
+									break;
+								}
+							}
+						}
+					}
+				}
+				if((factionID != null)
+				&&(factionID.length()>0))
+				{
+					baseLoss=100;
+					final Faction F=CMLib.factions().getFaction(factionID);
+					final int casterF = mob.fetchFaction(factionID);
+					final int targetF = tmob.fetchFaction(factionID);
+					int targetDiff = 0;
+					int targetChange = 0;
+					if(targetF == Integer.MAX_VALUE)
+					{
+						targetDiff=CMath.abs(rangeChange);
+						targetChange=-rangeChange;
+					}
+					else
+					{
+						targetDiff=CMath.abs(targetF-rangeChange);
+						if(targetChange > targetF)
+							targetChange=targetDiff;
+						else
+							targetChange=-targetDiff;
+					}
+					baseLoss += targetDiff/10;
+
+					wishDrain(mob,baseLoss,false);
+					if(mob != tmob)
+					{
+						if(casterF==Integer.MAX_VALUE)
+						{
+							mob.addFaction(F.factionID(), -rangeChange);
+							mob.tell(L("Your wish causes you become known by @x1!",F.name()));
+						}
+						else
+						{
+							mob.addFaction(F.factionID(), casterF-targetChange);
+							if(targetChange > 0)
+								mob.tell(L("Your wish causes you to lose faction with @x1!",F.name()));
+							else
+								mob.tell(L("Your wish causes you to gain faction with @x1!",F.name()));
+						}
+					}
+					else
+					if(targetF==Integer.MAX_VALUE)
+					{
+						tmob.addFaction(F.factionID(), -rangeChange);
+						mob.location().show(mob,null,CMMsg.MSG_OK_ACTION,L("@x1 has become known to @x2.",target.name(),F.name()));
+					}
+					else
+					{
+						tmob.addFaction(F.factionID(), targetF+targetChange);
+						if(targetChange > 0)
+							mob.location().show(mob,null,CMMsg.MSG_OK_ACTION,L("@x1 has gain reputation with @x2.",target.name(),F.name()));
+						else
+							mob.location().show(mob,null,CMMsg.MSG_OK_ACTION,L("@x1 has lost reputation with @x2.",target.name(),F.name()));
+					}
+					tmob.recoverCharStats();
+					tmob.recoverMaxState();
+					tmob.recoverPhyStats();
+					mob.recoverCharStats();
+					mob.recoverMaxState();
+					mob.recoverPhyStats();
+					return true;
+				}
+			}
 			baseLoss=getXPCOSTAdjustment(mob,baseLoss);
 			CMLib.leveler().postExperience(mob,null,null,-baseLoss,false);
 			Log.sysOut("Wish",mob.Name()+" unsuccessfully wished for '"+CMParms.combine(commands,0)+"'");

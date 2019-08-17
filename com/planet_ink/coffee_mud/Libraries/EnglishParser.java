@@ -137,6 +137,32 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 	}
 
 	@Override
+	public String makePastTense(String word, final String defaultWord)
+	{
+		if(word == null)
+			return defaultWord;
+		word = word.trim();
+		if(word.length()==0)
+			return defaultWord;
+		final int x=word.indexOf(' ');
+		if(x>0)
+			word=word.substring(x+1).trim();
+		if(word.endsWith("(s)"))
+			word=word.substring(0, word.length()-3);
+		if(word.endsWith("(es)"))
+			word=word.substring(0, word.length()-4);
+		if(word.endsWith("(ys)"))
+			word=word.substring(0, word.length()-4);
+		if(CMStrings.isVowel(word.charAt(word.length()-1)))
+			return word+"d";
+		else
+		if(!word.endsWith("ed"))
+			return word+"ed";
+		else
+			return word;
+	}
+
+	@Override
 	public boolean isAnArticle(String s)
 	{
 		s=s.toLowerCase();
@@ -153,6 +179,14 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 	{
 		if((str==null)||(str.length()==0))
 			return str;
+
+		if(str.indexOf("(s)")>0)
+			return CMStrings.replaceAll(str, "(s)", "s");
+		if(str.indexOf("(es)")>0)
+			return CMStrings.replaceAll(str, "(es)", "es");
+		if(str.indexOf("(ys)")>0)
+			return CMStrings.replaceAll(str, "(ys)", "ies");
+
 		final boolean uppercase=Character.isUpperCase(str.charAt(str.length()-1));
 		final String lowerStr=str.toLowerCase();
 		if(CMStrings.contains(fnouns, lowerStr))
@@ -995,11 +1029,25 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 	}
 
 	@Override
+	public String spaceOutPunctuation(final String str)
+	{
+		if(!hasPunctuation(str))
+			return str;
+		final char[] strc=str.toCharArray();
+		for(int x=0;x<strc.length;x++)
+		{
+			if(isPunctuation((byte)strc[x]))
+				strc[x]=' ';
+		}
+		return new String(strc);
+	}
+
+	@Override
 	public List<String> parseWords(final String thisStr)
 	{
 		if((thisStr==null)||(thisStr.length()==0))
 			return new Vector<String>(1);
-		return CMParms.parseSpaces(stripPunctuation(thisStr), true);
+		return CMParms.parseSpaces(spaceOutPunctuation(thisStr), true);
 	}
 
 	public boolean equalsPunctuationless(final char[] strC, final char[] str2C)
@@ -1174,16 +1222,25 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 	}
 
 	@Override
-	public String bumpDotNumber(final String srchStr)
+	public String bumpDotContextNumber(final String srchStr, final int thisMuch)
 	{
 		final FetchFlags flags=fetchFlags(srchStr);
 		if(flags==null)
 			return srchStr;
 		if(flags.allFlag)
 			return srchStr;
-		if(flags.occurrance==0)
-			return "1."+flags.srchStr;
-		return (flags.occurrance+1)+"."+flags.srchStr;
+		return (flags.occurrance+thisMuch)+"."+flags.srchStr;
+	}
+
+	@Override
+	public int getContextDotNumber(final String srchStr)
+	{
+		final FetchFlags flags=fetchFlags(srchStr);
+		if(flags==null)
+			return 0;
+		if(flags.allFlag)
+			return 0;
+		return flags.occurrance;
 	}
 
 	@Override
@@ -1344,15 +1401,15 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 	}
 
 	@Override
-	public Environmental parseShopkeeper(final MOB mob, final List<String> commands, final String error)
+	public Environmental parseShopkeeper(final MOB mob, final List<String> matchWords, final String error)
 	{
-		if(commands.isEmpty())
+		if(matchWords.isEmpty())
 		{
 			if(error.length()>0)
 				mob.tell(error);
 			return null;
 		}
-		commands.remove(0);
+		matchWords.remove(0);
 
 		final List<Environmental> V=CMLib.coffeeShops().getAllShopkeepers(mob.location(),mob);
 		if(V.isEmpty())
@@ -1363,13 +1420,13 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 		}
 		if(V.size()>1)
 		{
-			if(commands.size()<2)
+			if(matchWords.size()<2)
 			{
 				if(error.length()>0)
 					mob.tell(error);
 				return null;
 			}
-			final String what=commands.get(commands.size()-1);
+			final String what=matchWords.get(matchWords.size()-1);
 
 			Environmental shopkeeper=fetchEnvironmental(V,what,false);
 			if((shopkeeper==null)&&(what.equals("shop")||what.equals("the shop")))
@@ -1386,33 +1443,33 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 			if((shopkeeper!=null)
 			&&(CMLib.coffeeShops().getShopKeeper(shopkeeper)!=null)
 			&&(CMLib.flags().canBeSeenBy(shopkeeper,mob)))
-				commands.remove(commands.size()-1);
+				matchWords.remove(matchWords.size()-1);
 			else
 			{
-				CMLib.commands().postCommandFail(mob,new XVector<String>(commands),
-						L("You don't see anyone called '@x1' here buying or selling.",commands.get(commands.size()-1)));
+				CMLib.commands().postCommandFail(mob,new XVector<String>(matchWords),
+						L("You don't see anyone called '@x1' here buying or selling.",matchWords.get(matchWords.size()-1)));
 				return null;
 			}
 			return shopkeeper;
 		}
 		Environmental shopkeeper=V.get(0);
-		if(commands.size()>1)
+		if(matchWords.size()>1)
 		{
-			final MOB M=mob.location().fetchInhabitant(commands.get(commands.size()-1));
+			final MOB M=mob.location().fetchInhabitant(matchWords.get(matchWords.size()-1));
 			if((M!=null)&&(CMLib.coffeeShops().getShopKeeper(M)!=null)&&(CMLib.flags().canBeSeenBy(M,mob)))
 			{
 				shopkeeper=M;
-				commands.remove(commands.size()-1);
+				matchWords.remove(matchWords.size()-1);
 			}
 		}
 		return shopkeeper;
 	}
 
 	@Override
-	public List<Item> fetchItemList(final Environmental from,
+	public List<Item> fetchItemList(final ItemPossessor from,
 									final MOB mob,
 									final Item container,
-									final List<String> commands,
+									final List<String> matchWords,
 									final Filterer<Environmental> filter,
 									final boolean visionMatters)
 	{
@@ -1421,15 +1478,15 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 		List<Item> V=new Vector<Item>();
 
 		int maxToItem=Integer.MAX_VALUE;
-		if((commands.size()>1)
-		&&(CMath.s_int(commands.get(0))>0))
+		if((matchWords.size()>1)
+		&&(CMath.s_int(matchWords.get(0))>0))
 		{
-			maxToItem=CMath.s_int(commands.get(0));
-			commands.set(0,"all");
+			maxToItem=CMath.s_int(matchWords.get(0));
+			matchWords.set(0,"all");
 		}
 
-		String name=CMParms.combine(commands,0);
-		boolean allFlag = (!commands.isEmpty()) ? commands.get(0).equalsIgnoreCase("all") : false;
+		String name=CMParms.combine(matchWords,0);
+		boolean allFlag = (!matchWords.isEmpty()) ? matchWords.get(0).equalsIgnoreCase("all") : false;
 		if (name.toUpperCase().startsWith("ALL."))
 		{
 			allFlag = true;
@@ -1488,7 +1545,7 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 
 		if(wornOnly && (!V.isEmpty()))
 		{
-			final Vector<Item> V2=new Vector<Item>();
+			final Vector<Item> V2=new Vector<Item>(); // return value
 			short topLayer=0;
 			short curLayer=0;
 			int which=-1;
@@ -1515,7 +1572,7 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 		else
 		if(unwornOnly && (!V.isEmpty()))
 		{
-			final Vector<Item> V2=new Vector<Item>();
+			final Vector<Item> V2=new Vector<Item>(); // return value
 			short topLayer=0;
 			short curLayer=0;
 			int which=-1;
@@ -2809,7 +2866,7 @@ public class EnglishParser extends StdLibrary implements EnglishParsing
 	@Override
 	public List<Item> fetchAvailableItems(final List<Item> list, String srchStr, final Item goodLocation, final Filterer<Environmental> filter, final boolean exactOnly)
 	{
-		final Vector<Item> matches=new Vector<Item>(1);
+		final Vector<Item> matches=new Vector<Item>(1); // return value
 		if(list.isEmpty())
 			return matches;
 		final FetchFlags flags=fetchFlags(srchStr);

@@ -102,7 +102,7 @@ public class Skill_Satire extends BardSkill
 		}
 		LegalBehavior B=null;
 		Area A2=null;
-		final Vector<MOB> forgivables=new Vector<MOB>();
+		final List<MOB> forgivables=new ArrayList<MOB>();
 		final Room room=mob.location();
 		if(room==null)
 		{
@@ -134,7 +134,7 @@ public class Skill_Satire extends BardSkill
 
 		if(forgivables.size()==0)
 		{
-			mob.tell(L("Noone you know is wanted for anything here."));
+			mob.tell(L("No one you know is wanted for anything here."));
 			return false;
 		}
 

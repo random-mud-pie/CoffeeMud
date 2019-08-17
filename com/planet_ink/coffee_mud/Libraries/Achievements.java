@@ -5246,6 +5246,11 @@ public class Achievements extends StdLibrary implements AchievementLibrary
 
 	private void ensureAchievementsLoaded()
 	{
+		if(CMLib.expertises().numExpertises()==0)
+		{
+			Log.errOut("Achievements being loaded before Expertises!");
+			Log.debugOut(new Exception("Debug Me!"));
+		}
 		if((playerAchievements==null)||(accountAchievements==null)||(clanAchievements==null))
 		{
 			synchronized(this)
@@ -5359,7 +5364,10 @@ public class Achievements extends StdLibrary implements AchievementLibrary
 	@Override
 	public void possiblyBumpAchievement(final MOB mob, final Event E, final int bumpNum, final Object... parms)
 	{
-		if((mob != null)&&(E!=null)&&(!mob.isMonster())&&(CMProps.getBoolVar(CMProps.Bool.MUDSTARTED)))
+		if((mob != null)
+		&&(E!=null)
+		&&(mob.isPlayer())
+		&&(CMProps.getBoolVar(CMProps.Bool.MUDSTARTED)))
 		{
 			ensureAchievementsLoaded();
 			final PlayerStats pStats = mob.playerStats();
@@ -5456,7 +5464,10 @@ public class Achievements extends StdLibrary implements AchievementLibrary
 	public List<Achievement> fakeBumpAchievement(final MOB mob, final Event E, final int bumpNum, final Object... parms)
 	{
 		final List<Achievement> achievements=new ArrayList<Achievement>(1);
-		if((mob != null)&&(E!=null)&&(!mob.isMonster())&&(CMProps.getBoolVar(CMProps.Bool.MUDSTARTED)))
+		if((mob != null)
+		&&(E!=null)
+		&&(mob.isPlayer())
+		&&(CMProps.getBoolVar(CMProps.Bool.MUDSTARTED)))
 		{
 			ensureAchievementsLoaded();
 			final PlayerStats pStats = mob.playerStats();
@@ -6012,7 +6023,7 @@ public class Achievements extends StdLibrary implements AchievementLibrary
 			holder.addTattoo(A.getTattoo());
 			if(!CMLib.flags().isCloaked(mob))
 			{
-				final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.ACHIEVEMENTS);
+				final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.ACHIEVEMENTS, mob);
 				final PlayerStats pStats = mob.playerStats();
 				final PlayerAccount account = (pStats != null) ? pStats.getAccount() : null;
 				final String name;
@@ -6304,7 +6315,7 @@ public class Achievements extends StdLibrary implements AchievementLibrary
 	@Override
 	public boolean addModifyAchievement(final MOB mob, final Agent agent, final String tattoo, final Achievement A)
 	{
-		if(mob.isMonster())
+		if(!mob.isPlayer())
 			return false;
 		boolean ok=false;
 		int showFlag=-1;

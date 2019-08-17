@@ -167,6 +167,7 @@ public class JournalFunction extends StdWebMacro
 				&&(entry.parent().equals(msg.parent())))
 					return "";
 			}
+			CMLib.journals().notifyPosting(journalName, msg.from(), msg.to(), msg.subj());
 			CMLib.database().DBWriteJournal(journalName,msg);
 			JournalInfo.clearJournalCache(httpReq, journalName);
 			if(parent!=null)
@@ -289,6 +290,7 @@ public class JournalFunction extends StdWebMacro
 						messages.append("Reply to #"+cardinalNumber+" not submitted -- No text!<BR>");
 					else
 					{
+						CMLib.journals().notifyReplying(journalName, entry.from(), from, entry.subj());
 						CMLib.database().DBWriteJournalReply(journalName,entry.key(),from,"","",clearWebMacros(text));
 						CMLib.journals().clearJournalSummaryStats(forum);
 						JournalInfo.clearJournalCache(httpReq, journalName);
@@ -449,10 +451,20 @@ public class JournalFunction extends StdWebMacro
 							if(journal.equals("FROM")||users.contains(journal)||isPlayer)
 							{
 								if(journal.equals("FROM"))
+								{
 									entry.to(entry.from());
+									final MOB toM=CMLib.players().getPlayerAllHosts(journal);
+									if(toM != null)
+										toM.tell(L("A message in @x1 was transferred to you.",journalName));
+								}
 								else
 								if(isPlayer)
+								{
 									entry.to(CMStrings.capitalizeAndLower(journal));
+									final MOB toM=CMLib.players().getPlayerAllHosts(journal);
+									if(toM != null)
+										toM.tell(L("A message in @x1 was transferred to you.",journalName));
+								}
 								else
 									entry.to(journal);
 								CMLib.journals().clearJournalSummaryStats(forum);

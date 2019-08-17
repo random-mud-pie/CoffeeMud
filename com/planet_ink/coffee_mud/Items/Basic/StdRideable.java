@@ -565,6 +565,14 @@ public class StdRideable extends StdContainer implements Rideable
 			return false;
 		switch(msg.targetMinor())
 		{
+		case CMMsg.TYP_PUSH:
+		case CMMsg.TYP_PULL:
+			if(amRiding(msg.source()))
+			{
+				msg.source().tell(L("You cannot do that while @x1 @x2!",stateString(msg.source()),name(msg.source())));
+				return false;
+			}
+			break;
 		case CMMsg.TYP_ADVANCE:
 			if((rideBasis()==Rideable.RIDEABLE_LADDER)
 			&&(amRiding(msg.source())))
@@ -609,8 +617,22 @@ public class StdRideable extends StdContainer implements Rideable
 		case CMMsg.TYP_SIT:
 			if(amRiding(msg.source()))
 			{
-				if((rideBasis()==Rideable.RIDEABLE_SLEEP) && (CMLib.flags().isSleeping(msg.source())))
+				switch(rideBasis())
+				{
+				case Rideable.RIDEABLE_ENTERIN:
+				case Rideable.RIDEABLE_WAGON:
+				case Rideable.RIDEABLE_WATER:
+				case Rideable.RIDEABLE_LAND:
+				case Rideable.RIDEABLE_AIR:
+				case Rideable.RIDEABLE_SIT:
 					return true;
+				case Rideable.RIDEABLE_SLEEP:
+					if(CMLib.flags().isSleeping(msg.source()))
+						return true;
+					break;
+				default:
+					break;
+				}
 				msg.source().tell(L("You are @x1 @x2!",stateString(msg.source()),name(msg.source())));
 				msg.source().setRiding(this);
 				return false;
@@ -644,7 +666,14 @@ public class StdRideable extends StdContainer implements Rideable
 		case CMMsg.TYP_SLEEP:
 			if((amRiding(msg.source()))
 			&&(((!msg.amITarget(this))&&(msg.target()!=null))
-			   ||((rideBasis()!=Rideable.RIDEABLE_SLEEP)&&(rideBasis()!=Rideable.RIDEABLE_ENTERIN))))
+			   ||((rideBasis()!=Rideable.RIDEABLE_SLEEP)
+					&&(rideBasis()!=Rideable.RIDEABLE_ENTERIN)
+					&&(rideBasis()!=Rideable.RIDEABLE_WAGON)
+					&&(rideBasis()!=Rideable.RIDEABLE_LAND)
+					&&(rideBasis()!=Rideable.RIDEABLE_AIR)
+					&&(rideBasis()!=Rideable.RIDEABLE_WATER)
+				)
+			))
 			{
 				msg.source().tell(L("You are @x1 @x2!",stateString(msg.source()),name(msg.source())));
 				msg.source().setRiding(this);
@@ -687,7 +716,16 @@ public class StdRideable extends StdContainer implements Rideable
 				msg.source().tell(null,msg.source(),null,L("<T-NAME> <T-IS-ARE> already @x1 @x2!",stateString(msg.source()),name(msg.source())));
 				return false;
 			}
-			if(msg.amITarget(this))
+			if((msg.tool() instanceof Item)
+			&&(msg.amITarget(this))
+			&&(((Item)msg.tool()).container() != container()))
+			{
+				msg.source().tell(null,msg.tool(),null,L("<T-NAME> can't be mounted to @x1 from where it is!",name(msg.source())));
+				return false;
+			}
+			else
+			if((msg.tool() instanceof MOB)
+			&&(msg.amITarget(this)))
 			{
 				final Rider whoWantsToRide=(msg.tool() instanceof Rider)?(Rider)msg.tool():msg.source();
 				if(amRiding(whoWantsToRide))
@@ -715,6 +753,13 @@ public class StdRideable extends StdContainer implements Rideable
 				if(msg.tool() instanceof Rideable)
 				{
 					msg.source().tell(L("@x1 is not allowed on @x2.",((Rideable)msg.tool()).name(msg.source()),name(msg.source())));
+					return false;
+				}
+				else
+				if((container() != null)
+				&&((MOB)msg.tool()).riding() != container())
+				{
+					msg.source().tell(L("@x1 can not be mounted to @x2 from there!",msg.tool().name(),name(msg.source())));
 					return false;
 				}
 				if(msg.tool()==null)
@@ -1033,7 +1078,7 @@ public class StdRideable extends StdContainer implements Rideable
 							final String sinkString = L("<T-NAME> start(s) sinking!");
 							shipR.show(msg.source(), this, CMMsg.MSG_OK_ACTION, sinkString);
 						}
-						if(!CMLib.leveler().postExperienceToAllAboard(msg.source().riding(), 500))
+						if(!CMLib.leveler().postExperienceToAllAboard(msg.source().riding(), 500, this))
 							CMLib.leveler().postExperience(msg.source(), null, null, 500, false);
 					}
 					else

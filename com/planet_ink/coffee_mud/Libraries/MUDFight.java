@@ -12,6 +12,7 @@ import com.planet_ink.coffee_mud.Commands.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.AccountStats.PrideStat;
 import com.planet_ink.coffee_mud.Common.interfaces.CMMsg.View;
+import com.planet_ink.coffee_mud.Common.interfaces.PlayerStats.PlayerCombatStat;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
@@ -1084,38 +1085,45 @@ public class MUDFight extends StdLibrary implements CombatLibrary
 	}
 
 	@Override
-	public CMMsg postWeaponAttackResult(final MOB source, final MOB target, final Item item, final boolean success)
+	public CMMsg postWeaponAttackResult(final MOB sourceM, final MOB targetM, final Item item, final boolean success)
 	{
-		if(source==null)
+		if(sourceM==null)
 			return null;
-		if(!source.mayIFight(target))
+		if(!sourceM.mayIFight(targetM))
 			return null;
 		Weapon weapon=null;
 		int damageInt = 0;
 		if(item instanceof Weapon)
 		{
 			weapon=(Weapon)item;
-			damageInt=adjustedDamage(source,weapon,target,0,true,false);
+			damageInt=adjustedDamage(sourceM,weapon,targetM,0,true,false);
 		}
 		if(success)
-			postWeaponDamage(source,target,item,damageInt);
+		{
+			if((sourceM.playerStats()!=null)
+			&&(sourceM!=targetM))
+				sourceM.playerStats().bumpLevelCombatStat(PlayerCombatStat.HITS_DONE, sourceM.basePhyStats().level(), 1);
+			if(targetM.playerStats()!=null)
+				targetM.playerStats().bumpLevelCombatStat(PlayerCombatStat.HITS_TAKEN, targetM.basePhyStats().level(), 1);
+			postWeaponDamage(sourceM,targetM,item,damageInt);
+		}
 		else
 		{
 			final String missString="^F^<FIGHT^>"+((weapon!=null)?
 								weapon.missString():
 								standardMissString(Weapon.TYPE_BASHING,Weapon.CLASS_BLUNT,item.name(),false))+"^</FIGHT^>^?";
-			final CMMsg msg=CMClass.getMsg(source,
-									target,
+			final CMMsg msg=CMClass.getMsg(sourceM,
+									targetM,
 									weapon,
 									CMMsg.MSG_ATTACKMISS,
 									missString);
 			CMLib.color().fixSourceFightColor(msg);
 			// why was there no okaffect here?
-			final Room R=source.location();
+			final Room R=sourceM.location();
 			if(R!=null)
-			if(R.okMessage(source,msg) && (!source.amDead()) && (!source.amDestroyed()))
+			if(R.okMessage(sourceM,msg) && (!sourceM.amDead()) && (!sourceM.amDestroyed()))
 			{
-				R.send(source,msg);
+				R.send(sourceM,msg);
 				return msg;
 			}
 		}
@@ -1392,161 +1400,174 @@ public class MUDFight extends StdLibrary implements CombatLibrary
 		return dividers;
 	}
 
-	protected DeadBody justDie(final MOB source, final MOB target)
+	protected DeadBody justDie(final MOB killerM, final MOB deadM)
 	{
-		if(target==null)
+		if(deadM==null)
 			return null;
-		final Room deathRoom=target.location();
+		final Room deathRoom=deadM.location();
 		if(deathRoom == null)
 			return null;
-		final Session srcSession=(source==null)?null:source.session();
-		final Session tgtSession=target.session();
+		if(deadM.isPlayer())
+		{
+			if(killerM != null)
+				CMLib.achievements().possiblyBumpAchievement(deadM, AchievementLibrary.Event.DEATHS, 1, killerM);
+			else
+				CMLib.achievements().possiblyBumpAchievement(deadM, AchievementLibrary.Event.DEATHS, 1, deadM);
+		}
+
+		final Session killerSess=(killerM==null)?null:killerM.session();
+		final Session deadMSess=deadM.session();
 
 		//TODO: this creates too many loops.  The right thing is to loop once
 		// and call  a boolean function to populate all these lists.
-		final CharClass combatCharClass=getCombatDominantClass(source,target);
-		final Set<MOB> beneficiaries=getCombatBeneficiaries(source,target,combatCharClass);
-		final Set<MOB> hisGroupH=target.getGroupMembers(new HashSet<MOB>());
+		final CharClass combatCharClass=getCombatDominantClass(killerM,deadM);
+		final Set<MOB> beneficiaries=getCombatBeneficiaries(killerM,deadM,combatCharClass);
+		final Set<MOB> hisGroupH=deadM.getGroupMembers(new HashSet<MOB>());
 		for(final Enumeration<MOB> m=deathRoom.inhabitants();m.hasMoreElements();)
 		{
 			final MOB M=m.nextElement();
 			if((M!=null)
-			&&(M.getVictim()==target))
-				pickNextVictim(M, target, hisGroupH);
+			&&(M.getVictim()==deadM))
+				pickNextVictim(M, deadM, hisGroupH);
 		}
-		final Set<MOB> dividers=getCombatDividers(source,target,combatCharClass);
+		final Set<MOB> dividers=getCombatDividers(killerM,deadM,combatCharClass);
 
-		if(source != null)
-			CMLib.get(srcSession)._combat().dispenseExperience(beneficiaries,dividers,target);
+		if(killerM != null)
+			CMLib.get(killerSess)._combat().dispenseExperience(beneficiaries,dividers,deadM);
 		else
-			CMLib.get(tgtSession)._combat().dispenseExperience(beneficiaries,dividers,target);
+			CMLib.get(deadMSess)._combat().dispenseExperience(beneficiaries,dividers,deadM);
 
-		final String currency=CMLib.beanCounter().getCurrency(target);
-		final double deadMoney=CMLib.beanCounter().getTotalAbsoluteValue(target,currency);
+		final String currency=CMLib.beanCounter().getCurrency(deadM);
+		final double deadMoney=CMLib.beanCounter().getTotalAbsoluteValue(deadM,currency);
 		double myAmountOfDeadMoney=0.0;
-		final Vector<MOB> goldLooters=new Vector<MOB>();
+		final List<MOB> goldLooters=new ArrayList<MOB>();
 		for (final MOB M : beneficiaries)
 		{
 			if(((M.isAttributeSet(MOB.Attrib.AUTOGOLD))
 			&&(!goldLooters.contains(M)))
-			&&(M!=target)
+			&&(M!=deadM)
 			&&(M.location()==deathRoom)
 			&&(deathRoom.isInhabitant(M)))
-				goldLooters.addElement(M);
+				goldLooters.add(M);
 		}
 		if((goldLooters.size()>0)&&(deadMoney>0))
 		{
 			myAmountOfDeadMoney=CMath.div(deadMoney,goldLooters.size());
-			CMLib.beanCounter().subtractMoney(target,deadMoney);
+			CMLib.beanCounter().subtractMoney(deadM,deadMoney);
 		}
 
-		final int[] expLost={100*target.phyStats().level()};
+		final int[] expLost={100*deadM.phyStats().level()};
 		if(expLost[0]<100)
 			expLost[0]=100;
 		String[] cmds=null;
-		if((target.isMonster())||(target.soulMate()!=null))
+		if((deadM.isMonster())||(deadM.soulMate()!=null))
 			cmds=CMParms.toStringArray(CMParms.parseCommas(CMProps.getVar(CMProps.Str.MOBDEATH),true));
 		else
-			cmds=CMParms.toStringArray(CMParms.parseCommas(CMProps.get(target.session()).getStr(CMProps.Str.PLAYERDEATH),true));
+			cmds=CMParms.toStringArray(CMParms.parseCommas(CMProps.get(deadM.session()).getStr(CMProps.Str.PLAYERDEATH),true));
 
 		DeadBody body=null; //must be done before consequences because consequences could be purging
 		if((!CMParms.containsIgnoreCase(cmds,"RECALL"))
-		&&(!isKnockedOutUponDeath(target,source)))
-			body=target.killMeDead(true);
+		&&(!isKnockedOutUponDeath(deadM,killerM)))
+			body=deadM.killMeDead(true);
 
-		final boolean stillExists = handleCombatLossConsequences(target,source,cmds,expLost,"^*You lose @x1 experience points.^?^.");
-		if(!isKnockedOutUponDeath(target,source))
+		final boolean stillExists = handleCombatLossConsequences(deadM,killerM,cmds,expLost,"^*You lose @x1 experience points.^?^.");
+		if(!isKnockedOutUponDeath(deadM,killerM))
 		{
 			Room bodyRoom=deathRoom;
 			if((body!=null)&&(body.owner() instanceof Room)&&(((Room)body.owner()).isContent(body)))
 				bodyRoom=(Room)body.owner();
-			if((source!=null)&&(body!=null))
+			if((killerM!=null)&&(body!=null))
 			{
-				body.setKillerName(source.Name());
-				body.setIsKillerPlayer(!source.isMonster());
-				body.setKillerTool(source.fetchWieldedItem());
+				body.setKillerName(killerM.Name());
+				body.setIsKillerPlayer(!killerM.isMonster());
+				body.setKillerTool(killerM.fetchWieldedItem());
 				if(body.getKillerTool()==null)
-					body.setKillerTool(source.getNaturalWeapon());
+					body.setKillerTool(killerM.getNaturalWeapon());
 			}
 
-			if((!target.isMonster())
+			if((!deadM.isMonster())
 			&&(CMLib.dice().rollPercentage()==1)
 			&&(!CMSecurity.isDisabled(CMSecurity.DisFlag.AUTODISEASE))
 			&&(stillExists))
 			{
 				final Ability A=CMClass.getAbility("Disease_Amnesia");
 				if((A!=null)
-				&&(target.fetchEffect(A.ID())==null)
+				&&(deadM.fetchEffect(A.ID())==null)
 				&&(!CMSecurity.isAbilityDisabled(A.ID())))
-					A.invoke(target,target,true,0);
+					A.invoke(deadM,deadM,true,0);
 			}
 
-			if(target.soulMate()!=null)
+			if(deadM.soulMate()!=null)
 			{
-				final Session s=target.session();
-				s.setMob(target.soulMate());
-				target.soulMate().setSession(s);
-				target.setSession(null);
-				target.soulMate().tell(L("^HYour spirit has returned to your body...\n\r\n\r^N"));
-				CMLib.commands().postLook(target.soulMate(),true);
-				target.setSoulMate(null);
+				final Session s=deadM.session();
+				s.setMob(deadM.soulMate());
+				deadM.soulMate().setSession(s);
+				deadM.setSession(null);
+				deadM.soulMate().tell(L("^HYour spirit has returned to your body...\n\r\n\r^N"));
+				CMLib.commands().postLook(deadM.soulMate(),true);
+				deadM.setSoulMate(null);
 			}
 
-			if((source!=null)
+			if((killerM!=null)
 			&&(bodyRoom!=null)
 			&&(body!=null)
-			&&(source.location()==bodyRoom)
-			&&(bodyRoom.isInhabitant(source))
-			&&(source.isAttributeSet(MOB.Attrib.AUTOLOOT)))
+			&&(killerM.location()==bodyRoom)
+			&&(bodyRoom.isInhabitant(killerM))
+			&&(killerM.isAttributeSet(MOB.Attrib.AUTOLOOT)))
 			{
-				if((source.riding()!=null)&&(source.riding() instanceof MOB))
-					source.tell(L("You'll need to dismount to loot the body."));
+				if((killerM.riding()!=null)&&(killerM.riding() instanceof MOB))
+					killerM.tell(L("You'll need to dismount to loot the body."));
 				else
-				if((source.riding()!=null)&&(source.riding() instanceof MOB))
-					source.tell(L("You'll need to disembark to loot the body."));
+				if((killerM.riding()!=null)&&(killerM.riding() instanceof MOB))
+					killerM.tell(L("You'll need to disembark to loot the body."));
 				else
 				for(int i=bodyRoom.numItems()-1;i>=0;i--)
 				{
 					final Item item=bodyRoom.getItem(i);
 					if((item!=null)
 					&&(item.container()==body)
-					&&(CMLib.flags().canBeSeenBy(body,source))
+					&&(CMLib.flags().canBeSeenBy(body,killerM))
 					&&((!body.isDestroyedAfterLooting())||(!(item instanceof RawMaterial)))
-					&&(CMLib.flags().canBeSeenBy(item,source)))
-						CMLib.commands().postGet(source,body,item,false);
+					&&(CMLib.flags().canBeSeenBy(item,killerM)))
+						CMLib.commands().postGet(killerM,body,item,false);
 				}
 				if(body.isDestroyedAfterLooting())
 					bodyRoom.recoverRoomStats();
 			}
 
 			Coins C=null;
-			if((deadMoney>0)&&(myAmountOfDeadMoney>0)&&(body!=null)&&(bodyRoom!=null))
-			for(int g=0;g<goldLooters.size();g++)
+			if((deadMoney>0)
+			&&(myAmountOfDeadMoney>0)
+			&&(body!=null)
+			&&(bodyRoom!=null))
 			{
-				C=CMLib.beanCounter().makeBestCurrency(currency,myAmountOfDeadMoney,null,body);
-				if(C!=null)
+				for(int g=0;g<goldLooters.size();g++)
 				{
-					C.recoverPhyStats();
-					bodyRoom.addItem(C,ItemPossessor.Expire.Monster_EQ);
-					bodyRoom.recoverRoomStats();
-					final MOB mob=goldLooters.elementAt(g);
-					if(mob.location()==bodyRoom)
+					C=CMLib.beanCounter().makeBestCurrency(currency,myAmountOfDeadMoney,null,body);
+					if(C!=null)
 					{
-						if((mob.riding()!=null)&&(mob.riding() instanceof MOB))
-							mob.tell(L("You'll need to dismount to get @x1 off the body.",C.name()));
-						else
-						if((mob.riding()!=null)&&(mob.riding() instanceof Item))
-							mob.tell(L("You'll need to disembark to get @x1 off the body.",C.name()));
-						else
-						if(CMLib.flags().canBeSeenBy(body,mob))
-							CMLib.commands().postGet(mob,body,C,false);
+						C.recoverPhyStats();
+						bodyRoom.addItem(C,ItemPossessor.Expire.Monster_EQ);
+						bodyRoom.recoverRoomStats();
+						final MOB mob=goldLooters.get(g);
+						if(mob.location()==bodyRoom)
+						{
+							if((mob.riding()!=null)&&(mob.riding() instanceof MOB))
+								mob.tell(L("You'll need to dismount to get @x1 off the body.",C.name()));
+							else
+							if((mob.riding()!=null)&&(mob.riding() instanceof Item))
+								mob.tell(L("You'll need to disembark to get @x1 off the body.",C.name()));
+							else
+							if(CMLib.flags().canBeSeenBy(body,mob))
+								CMLib.commands().postGet(mob,body,C,false);
+						}
 					}
 				}
 			}
 
-			if((source != null)&&(source.getVictim()==target))
-				source.setVictim(null);
-			target.setVictim(null);
+			if((killerM != null)&&(killerM.getVictim()==deadM))
+				killerM.setVictim(null);
+			deadM.setVictim(null);
 			if((body!=null)&&(bodyRoom!=null)&&(body.isDestroyedAfterLooting()))
 			{
 				for(int i=bodyRoom.numItems()-1;i>=0;i--)
@@ -2217,8 +2238,15 @@ public class MUDFight extends StdLibrary implements CombatLibrary
 		}
 		synchronized(("DMG"+target.Name().toUpperCase()).intern())
 		{
-			if((dmg>0)&&(target.curState().getHitPoints()>0))
+			if((dmg>0)
+			&&(target.curState().getHitPoints()>0))
 			{
+				if((attacker!=null)
+				&&(attacker.playerStats()!=null)
+				&&(attacker!=target))
+					attacker.playerStats().bumpLevelCombatStat(PlayerCombatStat.DAMAGE_DONE, attacker.basePhyStats().level(), dmg);
+				if(target.playerStats()!=null)
+					target.playerStats().bumpLevelCombatStat(PlayerCombatStat.DAMAGE_TAKEN, target.basePhyStats().level(), dmg);
 				if((!target.curState().adjHitPoints(-dmg,target.maxState()))
 				&&(target.curState().getHitPoints()<1)
 				&&(target.location()!=null))
@@ -2263,12 +2291,14 @@ public class MUDFight extends StdLibrary implements CombatLibrary
 		{
 			if((!deadmob.isMonster())&&(deadmob.soulMate()==null))
 			{
+				if(deadmob.playerStats()!=null)
+					deadmob.playerStats().bumpLevelCombatStat(PlayerCombatStat.DEATHS_TAKEN, deadmob.basePhyStats().level(), 1);
 				CMLib.coffeeTables().bump(deadmob,CoffeeTableRow.STAT_DEATHS);
 				final PlayerStats playerStats=deadmob.playerStats();
 				if(playerStats!=null)
 					playerStats.setHygiene(0);
-				final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.DETAILEDDEATHS);
-				final List<String> channels2=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.DEATHS);
+				final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.DETAILEDDEATHS, deadmob);
+				final List<String> channels2=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.DEATHS, deadmob);
 				if(!CMLib.flags().isCloaked(deadmob))
 				{
 					for(int i=0;i<channels.size();i++)
@@ -2290,6 +2320,15 @@ public class MUDFight extends StdLibrary implements CombatLibrary
 			{
 				final MOB killer=(MOB)msg.tool();
 				doDeathPostProcessing(msg);
+				int count=10;
+				MOB killerM=killer;
+				while((killerM != null)
+				&&(--count>0))
+				{
+					if(killerM.playerStats()!=null)
+						killerM.playerStats().bumpLevelCombatStat(PlayerCombatStat.DEATHS_DONE, killerM.basePhyStats().level(), 1);
+					killerM=killerM.amFollowing();
+				}
 				justDie(killer,deadmob);
 			}
 			else
@@ -2575,11 +2614,11 @@ public class MUDFight extends StdLibrary implements CombatLibrary
 		V.addElement(to);
 		if(R==null)
 			return V;
-		final Vector<MOB> everyV=new Vector<MOB>();
+		final List<MOB> everyV=new ArrayList<MOB>();
 		for(int i=0;i<R.numInhabitants();i++)
-			everyV.addElement(R.fetchInhabitant(i));
+			everyV.add(R.fetchInhabitant(i));
 		if(!everyV.contains(to))
-			everyV.addElement(to);
+			everyV.add(to);
 		final int[][] map=new int[everyV.size()][everyV.size()];
 		for(int x=0;x<map.length;x++)
 		{

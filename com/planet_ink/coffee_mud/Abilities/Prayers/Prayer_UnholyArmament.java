@@ -135,7 +135,7 @@ public class Prayer_UnholyArmament extends Prayer
 				I.setDisplayText(L("an wicked looking blade sits here."));
 				((Weapon)I).setWeaponClassification(Weapon.CLASS_SWORD);
 				((Weapon)I).setWeaponDamageType(Weapon.TYPE_SLASHING);
-				I.setDescription(L("Whatever made this sharp twisted thing couldn`t have been good.."));
+				I.setDescription(L("Whatever made this twisted thing couldn`t have been good.."));
 				I.basePhyStats().setLevel(mob.phyStats().level());
 				I.basePhyStats().setWeight(20);
 				I.setMaterial(RawMaterial.RESOURCE_MITHRIL);
@@ -218,6 +218,11 @@ public class Prayer_UnholyArmament extends Prayer
 					I.setName(L("an unholy girdle"));
 					I.setDisplayText(L("a wicked looking girdle sits here."));
 					I.setDescription(L("Whatever made this twisted black metal couldn`t have been good."));
+					if(I instanceof Container)
+					{
+						((Container)I).setCapacity(50);
+						((Container)I).setContainTypes(Container.CONTAIN_ONEHANDWEAPONS);
+					}
 				}
 				if(pos==Wearable.WORN_LEGS)
 				{
@@ -241,6 +246,9 @@ public class Prayer_UnholyArmament extends Prayer
 			A=CMClass.getAbility("Prop_ScrapExplode");
 			if(A!=null)
 				I.addNonUninvokableEffect(A);
+			final Ability unholyA=(Ability)copyOf();
+			unholyA.setMiscText(mob.Name());
+			I.addNonUninvokableEffect(unholyA);
 			I.recoverPhyStats();
 			final int numFound=mob.findItems(null,"$"+I.name()+"$").size() + mob.location().findItems(null,"$"+I.name()+"$").size();
 			if(numFound>=numThatsOk)

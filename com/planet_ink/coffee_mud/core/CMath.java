@@ -321,7 +321,7 @@ public class CMath
 		if(ups.length()==0)
 			return false;
 		int start=0;
-		if(ups.startsWith("-"))
+		if(ups.startsWith("-") && (ups.length()>1))
 			start=1;
 		for(int i=start;i<ups.length();i++)
 		{
@@ -899,7 +899,7 @@ public class CMath
 			return s.substring(0,s.length()-1);
 		return s;
 	}
-	
+
 	/**
 	 * Converts a percentage 1&gt;d&gt;0 to a string.
 	 * With NO decimal places!
@@ -2271,6 +2271,31 @@ public class CMath
 	public final static long round(final float d)
 	{
 		return Math.round(d);
+	}
+
+	/**
+	 * Rounds to specified precision
+	 * @see java.lang.Math#round(float)
+	 * @param d the real number
+	 * @return the rounded number as a long
+	 */
+	public final static double round(final double d, final int precision)
+	{
+		final double dPrecision = Math.pow(10, precision);
+		return (Math.round(d)*dPrecision)/dPrecision;
+	}
+
+
+	/**
+	 * Rounds to specified precision
+	 * @see java.lang.Math#round(float)
+	 * @param d the real number
+	 * @return the rounded number as a long
+	 */
+	public final static float round(final float d, final int precision)
+	{
+		final double dPrecision = Math.pow(10, precision);
+		return (float)((Math.round(d)*dPrecision)/dPrecision);
 	}
 
 	/**

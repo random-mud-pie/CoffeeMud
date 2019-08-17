@@ -263,7 +263,7 @@ public class Prop_RoomForSale extends Property implements LandTitle
 		&&(affected instanceof Room))
 		{
 			updateLot(null);
-			final Vector<MOB> mobs=new Vector<MOB>();
+			final List<MOB> mobs=new ArrayList<MOB>();
 			Room R=(Room)affected;
 			if(R!=null)
 			{
@@ -279,7 +279,7 @@ public class Prop_RoomForSale extends Property implements LandTitle
 						&&((M.basePhyStats().rejuv()==0)||(M.basePhyStats().rejuv()==PhyStats.NO_REJUV)))
 						{
 							CMLib.catalog().updateCatalogIntegrity(M);
-							mobs.addElement(M);
+							mobs.add(M);
 						}
 					}
 					if(!CMSecurity.isSaveFlag(CMSecurity.SaveFlag.NOPROPERTYMOBS))
@@ -424,7 +424,7 @@ public class Prop_RoomForSale extends Property implements LandTitle
 				}
 				if(!playerExists)
 				{
-					Log.warnOut("Property owned by "+T.getOwnerName()+" is now lost: "+T.getUniqueLotID());
+					Log.warnOut("Property owned by non-existant player "+T.getOwnerName()+" is now lost: "+T.getUniqueLotID());
 					T.setOwnerName("");
 					T.updateLot(null);
 					return new int[] {-1, 0};

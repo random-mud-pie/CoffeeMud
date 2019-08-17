@@ -39,6 +39,8 @@ import java.util.*;
 */
 public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 {
+	protected int experienceCap = -1;
+
 	@Override
 	public String ID()
 	{
@@ -226,7 +228,7 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 		mob.baseState().setMovement(getLevelMove(mob));
 		if(mob.getWimpHitPoint()>0)
 			mob.setWimpHitPoint((int)Math.round(CMath.mul(mob.curState().getHitPoints(),.10)));
-		mob.setExperience(CMLib.leveler().getLevelExperience(mob.basePhyStats().level()));
+		mob.setExperience(getLevelExperience(mob.basePhyStats().level()));
 		return mob;
 	}
 
@@ -329,7 +331,7 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 		mob.tell(L("^ZYou have ****LOST A LEVEL****^.^N\n\r\n\r@x1",CMLib.protocol().msp("doh.wav",60)));
 		if(!mob.isMonster())
 		{
-			final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LOSTLEVELS);
+			final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LOSTLEVELS, mob);
 			if(!CMLib.flags().isCloaked(mob))
 			for(int i=0;i<channels.size();i++)
 				CMLib.commands().postChannel(channels.get(i),mob.clans(),L("@x1 has just lost a level.",mob.Name()),true);
@@ -383,6 +385,9 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 		mob.delExpertise(null); // clears the cache
 		CMLib.achievements().possiblyBumpAchievement(mob, AchievementLibrary.Event.LEVELSGAINED, -1, mob);
 		CMLib.achievements().possiblyBumpAchievement(mob, AchievementLibrary.Event.CLASSLEVELSGAINED, -1, mob);
+		if(mob.isPlayer()
+		&&(!CMLib.flags().isInTheGame(mob, true)))
+			CMLib.database().DBUpdatePlayerMOBOnly(mob);
 	}
 
 	@Override
@@ -488,7 +493,7 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 				int sireShare=(int)Math.round(CMath.div(amount,10.0));
 				if(sireShare<=0)
 					sireShare=1;
-				CMLib.leveler().postExperience(sire,null," from "+mob.name(sire),sireShare,quiet);
+				postExperience(sire,null," from "+mob.name(sire),sireShare,quiet);
 				return amount-sireShare;
 			}
 		}
@@ -497,9 +502,20 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 
 	protected void checkLevelGain(final MOB mob)
 	{
+		if(mob == null)
+			return;
 		if((mob.getExperience()>=mob.getExpNextLevel())
 		&&(mob.getExpNeededLevel()<Integer.MAX_VALUE))
-			level(mob);
+		{
+			synchronized(("SYSTEM_LEVELING_"+mob.Name()).intern())
+			{
+				synchronized(mob) // does this really do anything?
+				{}
+				if((mob.getExperience()>=mob.getExpNextLevel())
+				&&(mob.getExpNeededLevel()<Integer.MAX_VALUE))
+					level(mob);
+			}
+		}
 	}
 
 	@Override
@@ -571,18 +587,21 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 			}
 		}
 
-		mob.setExperience(mob.getExperience()+amount);
-		if(pStats != null)
-			pStats.setLastXPAwardMillis(System.currentTimeMillis());
-		if(!quiet)
+		if((mob.basePhyStats().level() < CMProps.getIntVar(CMProps.Int.LASTPLAYERLEVEL))
+		||(mob.getExperience()<getGainedExperienceCap()))
 		{
-			if(amount>1)
-				mob.tell(L("^N^!You gain ^H@x1^N^! experience points@x2.^N",""+amount,homageMessage));
-			else
-			if(amount>0)
-				mob.tell(L("^N^!You gain ^H@x1^N^! experience point@x2.^N",""+amount,homageMessage));
+			mob.setExperience(mob.getExperience()+amount);
+			if(pStats != null)
+				pStats.setLastXPAwardMillis(System.currentTimeMillis());
+			if(!quiet)
+			{
+				if(amount>1)
+					mob.tell(L("^N^!You gain ^H@x1^N^! experience points@x2.^N",""+amount,homageMessage));
+				else
+				if(amount>0)
+					mob.tell(L("^N^!You gain ^H@x1^N^! experience point@x2.^N",""+amount,homageMessage));
+			}
 		}
-
 		checkLevelGain(mob);
 	}
 
@@ -644,13 +663,17 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 				return;
 		}
 
-		mob.setExperience(mob.getExperience()+amount);
-		if(pStats!=null)
-			pStats.setLastXPAwardMillis(System.currentTimeMillis());
-		//if(homageMessage==null)
-		//	homageMessage="";
-		//if(!quiet)
-		//	mob.tell(L("^N^!You gain ^H@x1^N^! roleplay XP@x2.^N",""+amount,homageMessage));
+		if((mob.basePhyStats().level() < CMProps.getIntVar(CMProps.Int.LASTPLAYERLEVEL))
+		||(mob.getExperience()<getGainedExperienceCap()))
+		{
+			mob.setExperience(mob.getExperience()+amount);
+			if(pStats!=null)
+				pStats.setLastXPAwardMillis(System.currentTimeMillis());
+			//if(homageMessage==null)
+			//	homageMessage="";
+			//if(!quiet)
+			//	mob.tell(L("^N^!You gain ^H@x1^N^! roleplay XP@x2.^N",""+amount,homageMessage));
+		}
 
 		checkLevelGain(mob);
 	}
@@ -663,11 +686,11 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 		||mob.charStats().getCurrentClass().expless()
 		||mob.charStats().getMyRace().expless())
 			return false;
-		final CMMsg msg=CMClass.getMsg(mob,victim,null,CMMsg.MASK_ALWAYS|CMMsg.TYP_EXPCHANGE,null,CMMsg.NO_EFFECT,homage,CMMsg.NO_EFFECT,""+quiet);
-		msg.setValue(amount);
 		final Room R=mob.location();
 		if(R!=null)
 		{
+			final CMMsg msg=CMClass.getMsg(mob,victim,null,CMMsg.MASK_ALWAYS|CMMsg.TYP_EXPCHANGE,null,CMMsg.NO_EFFECT,homage,CMMsg.NO_EFFECT,""+quiet);
+			msg.setValue(amount);
 			if(R.okMessage(mob,msg))
 				R.send(mob,msg);
 			else
@@ -706,6 +729,15 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 		else
 			loseRPExperience(mob,-amount);
 		return true;
+	}
+
+	protected int getGainedExperienceCap()
+	{
+		if(experienceCap < 0)
+		{
+			experienceCap = (int)Math.round(CMath.mul(getLevelExperience(CMProps.getIntVar(CMProps.Int.LASTPLAYERLEVEL)), 1.02));
+		}
+		return experienceCap;
 	}
 
 	@Override
@@ -775,8 +807,8 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 		if(mob.playerStats()!=null)
 		{
 			mob.playerStats().setLeveledDateTime(mob.basePhyStats().level(),mob.getAgeMinutes(),room);
-			final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.DETAILEDLEVELS);
-			final List<String> channels2=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LEVELS);
+			final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.DETAILEDLEVELS, mob);
+			final List<String> channels2=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.LEVELS, mob);
 			if(!CMLib.flags().isCloaked(mob))
 			for(int i=0;i<channels.size();i++)
 				CMLib.commands().postChannel(channels.get(i),mob.clans(),L("@x1 has just gained a level at @x2.",mob.Name(),CMLib.map().getDescriptiveExtendedRoomID(room)),true);
@@ -912,6 +944,9 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 
 		CMLib.achievements().possiblyBumpAchievement(mob, AchievementLibrary.Event.LEVELSGAINED, 1, mob);
 		CMLib.achievements().possiblyBumpAchievement(mob, AchievementLibrary.Event.CLASSLEVELSGAINED, 1, mob);
+		if(mob.isPlayer()
+		&&(!CMLib.flags().isInTheGame(mob, true)))
+			CMLib.database().DBUpdatePlayerMOBOnly(mob);
 	}
 
 	protected void ensureMaxDeferredXP(final MOB mob, final PlayerStats pStats)
@@ -1162,26 +1197,60 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 	}
 
 	@Override
-	public boolean postExperienceToAllAboard(final Physical possibleShip, final int amount)
+	public boolean postExperienceToAllAboard(final Physical possibleShip, final int amount, Physical target)
 	{
 		boolean posted = false;
 		if(possibleShip instanceof BoardableShip)
 		{
-			final Area A=((BoardableShip)possibleShip).getShipArea();
-			if(A!=null)
+			boolean destroyTargetMob=false;
+			final MOB targetM;
+			if(target instanceof MOB)
+				targetM=(MOB)target;
+			else
+			if(target==null)
+				targetM=null;
+			else
 			{
-				posted = true;
-				for(final Enumeration<Room> r=A.getProperMap();r.hasMoreElements();)
+				targetM=CMClass.getFactoryMOB(target.Name(), target.phyStats().level(), null);
+				if(target instanceof Rideable)
 				{
-					final Room R=r.nextElement();
-					if(R!=null)
+					synchronized(target)
 					{
-						for(final Enumeration<MOB> m=R.inhabitants();m.hasMoreElements();)
+						targetM.setRiding((Rideable)target);
+					}
+				}
+				destroyTargetMob=true;
+			}
+			try
+			{
+				final Area A=((BoardableShip)possibleShip).getShipArea();
+				if(A!=null)
+				{
+					posted = true;
+					for(final Enumeration<Room> r=A.getProperMap();r.hasMoreElements();)
+					{
+						final Room R=r.nextElement();
+						if(R!=null)
 						{
-							final MOB M=m.nextElement();
-							posted = CMLib.leveler().postExperience(M, null, null, amount, false) && posted;
+							for(final Enumeration<MOB> m=R.inhabitants();m.hasMoreElements();)
+							{
+								final MOB M=m.nextElement();
+								posted = postExperience(M, targetM, null, amount, false) && posted;
+							}
 						}
 					}
+				}
+			}
+			finally
+			{
+				if(destroyTargetMob
+				&&(targetM!=null))
+				{
+					synchronized(target)
+					{
+						targetM.setRiding(null);
+					}
+					targetM.destroy();
 				}
 			}
 		}
@@ -1191,5 +1260,6 @@ public class CoffeeLevels extends StdLibrary implements ExpLevelLibrary
 	@Override
 	public void propertiesLoaded()
 	{
+		experienceCap = -1;
 	}
 }

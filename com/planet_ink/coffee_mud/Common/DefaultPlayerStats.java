@@ -101,6 +101,7 @@ public class DefaultPlayerStats implements PlayerStats
 	protected long  		 replyTime		= 0;
 	protected Set<String>	 friends		= new SHashSet<String>();
 	protected Set<String>	 ignored		= new SHashSet<String>();
+	protected Set<String>	 subscriptions	= new SHashSet<String>();
 	protected List<String>	 tellStack		= new SVector<String>();
 	protected List<String>	 gtellStack		= new SVector<String>();
 	protected List<String>	 titles			= new SVector<String>();
@@ -112,6 +113,8 @@ public class DefaultPlayerStats implements PlayerStats
 	protected Set<String>	 introductions	= new SHashSet<String>();
 	protected long[]	 	 prideExpireTime= new long[TimeClock.TimePeriod.values().length];
 	protected int[][]		 prideStats		= new int[TimeClock.TimePeriod.values().length][AccountStats.PrideStat.values().length];
+	protected long[][]		 combatStats	= new long[0][PlayerCombatStat.values().length];
+
 	protected ItemCollection extItems;
 
 	protected volatile boolean		isSavable		= true;
@@ -167,6 +170,7 @@ public class DefaultPlayerStats implements PlayerStats
 			O.securityFlags=securityFlags.copyOf();
 			O.friends=new SHashSet<String>(friends);
 			O.ignored=new SHashSet<String>(ignored);
+			O.subscriptions=new SHashSet<String>(subscriptions);
 			O.tellStack=new SVector<String>(tellStack);
 			O.gtellStack=new SVector<String>(gtellStack);
 			O.titles=new SVector<String>(titles);
@@ -444,10 +448,12 @@ public class DefaultPlayerStats implements PlayerStats
 		if((str==null)||(str.length()==0))
 			return h;
 		str=CMStrings.replaceAll(str,"<FRIENDS>","");
+		str=CMStrings.replaceAll(str,"<SUBSCRIPTIONS>","");
 		str=CMStrings.replaceAll(str,"<IGNORED>","");
 		str=CMStrings.replaceAll(str,"<INTROS>","");
 		str=CMStrings.replaceAll(str,"</INTROS>","");
 		str=CMStrings.replaceAll(str,"</FRIENDS>","");
+		str=CMStrings.replaceAll(str,"</SUBSCRIPTIONS>","");
 		str=CMStrings.replaceAll(str,"</IGNORED>","");
 		int x=str.indexOf(';');
 		while(x>=0)
@@ -504,6 +510,14 @@ public class DefaultPlayerStats implements PlayerStats
 		if(account != null)
 			return account.getFriends();
 		return friends;
+	}
+
+	@Override
+	public Set<String> getSubscriptions()
+	{
+		if(account != null)
+			return account.getSubscriptions();
+		return subscriptions;
 	}
 
 	@Override
@@ -761,6 +775,7 @@ public class DefaultPlayerStats implements PlayerStats
 	{
 		final String friendsStr=getPrivateList(getFriends());
 		final String ignoredStr=getPrivateList(getIgnored());
+		final String subscriptionStr=getPrivateList(getSubscriptions());
 		final String privateListStr=getPrivateList(introductions);
 		final StringBuffer rest=new StringBuffer("");
 		final String[] codes=getStatCodes();
@@ -795,6 +810,7 @@ public class DefaultPlayerStats implements PlayerStats
 		return ((friendsStr.length()>0)?"<FRIENDS>"+friendsStr+"</FRIENDS>":"")
 			+((ignoredStr.length()>0)?"<IGNORED>"+ignoredStr+"</IGNORED>":"")
 			+((privateListStr.length()>0)?"<INTROS>"+privateListStr+"</INTROS>":"")
+			+((subscriptionStr.length()>0)?"<SUBSCRIPTIONS>"+subscriptionStr+"</SUBSCRIPTIONS>":"")
 			+"<WRAP>"+wrap+"</WRAP>"
 			+"<THEME>"+theme+"</THEME>"
 			+"<PAGEBREAK>"+pageBreak+"</PAGEBREAK>"
@@ -918,6 +934,11 @@ public class DefaultPlayerStats implements PlayerStats
 			Log.debugOut("FRIENDS="+str);
 		friends.clear();
 		friends.addAll(getHashFrom(str));
+		str=xmlLib.getValFromPieces(xml,"SUBSCRIPTIONS");
+		if(debug)
+			Log.debugOut("SUBSCRIPTIONS="+str);
+		subscriptions.clear();
+		subscriptions.addAll(getHashFrom(str));
 		str=xmlLib.getValFromPieces(xml,"IGNORED");
 		if(debug)
 			Log.debugOut("IGNORED="+str);
@@ -1633,7 +1654,8 @@ public class DefaultPlayerStats implements PlayerStats
 									 "BONUSCHARSTATS","AUTOINVSET",
 									 "MAXRPXP","CURRRPXP",
 									 "MAXDEFXP","CURRDEFXP",
-									 "LASTXPAWARD","FLAGS"};
+									 "LASTXPAWARD","FLAGS","SUBSCRIPTIONS",
+									 "COMBATSTATS"};
 
 	@Override
 	public String getStat(final String code)
@@ -1712,6 +1734,25 @@ public class DefaultPlayerStats implements PlayerStats
 			return ""+this.lastXPDateTime;
 		case 35:
 			return CMParms.toListString(playFlags);
+		case 36:
+			return getPrivateList(getSubscriptions());
+		case 37:
+		{
+			final StringBuilder str=new StringBuilder("");
+			if(combatStats.length>0)
+			{
+				for(final long[] list : this.combatStats)
+				{
+					if(list != null)
+						str.append(CMParms.toTightListString(list));
+					str.append(';');
+				}
+				while((str.length()>0)
+				&&(str.charAt(str.length()-1)==';'))
+					str.deleteCharAt(str.length()-1);
+			}
+			return str.toString();
+		}
 		default:
 			return CMProps.getStatCodeExtensionValue(getStatCodes(), xtraValues, code);
 		}
@@ -1845,6 +1886,30 @@ public class DefaultPlayerStats implements PlayerStats
 			}
 			break;
 		}
+		case 36:
+		{
+			subscriptions.clear();
+			subscriptions.addAll(getHashFrom(val));
+			break;
+		}
+		case 37:
+		{
+			final List<String> lines = CMParms.parseSemicolons(val, false);
+			while((lines.size()>0)
+			&& (lines.get(lines.size()-1).trim().length()==0))
+				lines.remove(lines.size()-1);
+			combatStats=new long[lines.size()][PlayerCombatStat.values().length];
+			for(int level = 0; level<combatStats.length; level++)
+			{
+				final long[] levelLine = CMParms.parseLongList(lines.get(level), ',');
+				if(levelLine.length < PlayerCombatStat.values().length)
+					combatStats[level] = Arrays.copyOf(levelLine, PlayerCombatStat.values().length);
+				else
+					combatStats[level] = levelLine;
+			}
+			break;
+
+		}
 		default:
 			CMProps.setStatCodeExtensionValue(getStatCodes(), xtraValues, code, val);
 			break;
@@ -1873,6 +1938,30 @@ public class DefaultPlayerStats implements PlayerStats
 	public void removeAutoInvokeList(final String abilityID)
 	{
 		this.autoInvokeSet.remove(abilityID);
+	}
+
+	@Override
+	public long bumpLevelCombatStat(final PlayerCombatStat stat, final int level, final int amt)
+	{
+		if((stat == null)
+		|| (level <= 0)
+		|| (CMSecurity.isDisabled(CMSecurity.DisFlag.COMBATSTATS))
+		|| (level >= CMProps.getIntVar(CMProps.Int.LASTPLAYERLEVEL)+10))
+			return 0;
+		if(level > combatStats.length)
+			combatStats = Arrays.copyOf(combatStats, level);
+		if(combatStats[level-1] == null)
+		{
+			combatStats[level-1] = new long[PlayerCombatStat.values().length];
+			combatStats[level-1][PlayerCombatStat.STATS_LEVEL.ordinal()] = level;
+		}
+		if((amt > 0)
+		&&(amt < Integer.MAX_VALUE/2))
+		{
+			if(Long.MAX_VALUE-combatStats[level-1][stat.ordinal()] > amt)
+				combatStats[level-1][stat.ordinal()] += amt;
+		}
+		return combatStats[level-1][stat.ordinal()];
 	}
 
 	@Override
@@ -1930,6 +2019,7 @@ public class DefaultPlayerStats implements PlayerStats
 	public void destroy()
 	{
 		friends.clear();
+		subscriptions.clear();
 		ignored.clear();
 		tellStack.clear();
 		gtellStack.clear();
@@ -1946,6 +2036,7 @@ public class DefaultPlayerStats implements PlayerStats
 		ableMap.clear();
 		experMap.clear();
 		levelInfo.clear();
+		combatStats=new long[0][PlayerCombatStat.values().length];
 	}
 
 	@Override

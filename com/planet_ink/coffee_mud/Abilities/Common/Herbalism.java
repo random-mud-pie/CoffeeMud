@@ -13,6 +13,7 @@ import com.planet_ink.coffee_mud.Commands.interfaces.*;
 import com.planet_ink.coffee_mud.Common.interfaces.*;
 import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
+import com.planet_ink.coffee_mud.Libraries.interfaces.AchievementLibrary;
 import com.planet_ink.coffee_mud.Libraries.interfaces.ExpertiseLibrary;
 import com.planet_ink.coffee_mud.Libraries.interfaces.ListingLibrary;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
@@ -94,8 +95,22 @@ public class Herbalism extends SpellCraftingSkill implements ItemCraftor
 		if((affected!=null)&&(affected instanceof MOB)&&(tickID==Tickable.TICKID_MOB))
 		{
 			final MOB mob=(MOB)affected;
-			if((buildingI==null)
-			||(theSpell==null))
+			if(buildingI==null)
+			{
+				aborted=true;
+				unInvoke();
+			}
+			else
+			if(super.activity == CraftingSkill.CraftingActivity.LEARNING)
+			{
+				if(tickUp==0)
+				{
+					displayText=L("You are studying @x1",buildingI.name());
+					verb=L("studying @x1",buildingI.name());
+				}
+			}
+			else
+			if(theSpell==null)
 			{
 				aborted=true;
 				unInvoke();
@@ -231,7 +246,10 @@ public class Herbalism extends SpellCraftingSkill implements ItemCraftor
 						buildingI.destroy();
 					}
 					else
+					{
 						mob.addItem(buildingI);
+						CMLib.achievements().possiblyBumpAchievement(mob, AchievementLibrary.Event.CRAFTING, 1, this);
+					}
 				}
 				buildingI=null;
 			}
@@ -352,7 +370,10 @@ public class Herbalism extends SpellCraftingSkill implements ItemCraftor
 		else
 		if(((commands.get(0))).equalsIgnoreCase("learn"))
 		{
-			return doLearnRecipe(mob, commands, givenTarget, auto, asLevel);
+			commonTell(mob,L("You don't know how to do that with herbalism."));
+			// disabled because of inability to determine ingredients.
+			//return doLearnRecipe(mob, commands, givenTarget, auto, asLevel);
+			return false;
 		}
 		else
 		if(commands.size()<2)

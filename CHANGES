@@ -1,3 +1,41 @@
+# Build 5.9.9 Release ?/?/2019
+  1. New prayers: empower unholy weapon, morph unholy weapon, faithful hellhound, discipline
+  2. New prayers: remove inhibitions
+  3. Prop_OpenCommand and Prop_CloseCommand have expanded arguments.
+  4. Room-based Gathering skills now decrease yield with repeated spams of the same room.
+  5. WHO list will now sort archons to the top.  WHO Account will sort by account name.
+  6. Monthly TOP reports will, at the end of the month, now be saved in DBFS dir /resources/reports
+  7. MUD Clients that only support 16 colors, can have 256-color ansi codes translated to 16.  See HELP ANSI.
+  8. ANSI-256 color codes are now all in /resources/skills/colors.txt
+  9. Shopkeeper VIEW on an ability will give it's help entry. 
+ 10. New command: WORTH, mostly for legacy mud support.
+ 11. New RPAWARDS: EMOTE-x and CHANNEL.  See coffeemud.ini file for more information
+ 12. Lacquering/Dyeing now support 256 colors and REMOVE, recipes updated and re-formatted.
+ 13. Wish now has a one rl-day cool-down.
+ 14. Siplet now supports ANSI-256
+ 15. New Scriptable command: MPCASTEXT, MPLINK, MPUNLINK, and MPPUT
+ 16. New MOB class: GenRideableUndead, with Raise Undead support in prayers.
+ 17. New internal property: ExtraData, for attaching random data to specific objects.
+ 18. New common skills: Master Dyeing, and Master Lacquering
+ 19. Players >= last player level no longer gain experience above a 2% over cap.
+ 20. New disease: Color Blindness.  All Canine-related races now have it.
+ 21. MANACOMPOUND system expanded to support multiple rules, masks, and ability cooldowns
+ 22. New PROMPT variable to list your skills on cooldown/mana compounding.
+ 23. New command: SUBSCRIBE, for getting notifications about journal posts
+ 24. New INI entries: MAXITEMSWORN, to limit total items worn, and MAXWEARPERLOC to limit replicated parts
+ 25. Combat stats now recorded for players at each level.  STAT COMBAT will give a limited view.
+ 26. Banker ability to hold items and make loans can be disabled on a per-mob basis.  See GenBanker in Archon's Guide.
+ 27. New property: Prop_LimitedEquip, for limiting the number of times a specific item can be equipped
+ 28. New Scriptable trigger: putting_prog 
+ 29. New locales for Sailing Ship prototyping: ShipDeck, ShipLightGunDeck, ShipHold, ShipMagazine, ShipQuarter, etc.
+ 30. New Aggressive behaviors option: NOGANG.. to prevent aggro mobs from ganging up on players
+ 31. CONFIG now has HELP, and also supports new player PRIVACY flag.
+ 32. New Command Line builder tool: TEMPLATE -- for saving your favorite kinds of things.
+ 33. New languages: PigLatin (for Archons), and Pirate (which the Pirate class now gets instead of thieves cant)
+ 34. New common skill/property: BookLoaning, similar to merchant, but for loaning instead of buying.
+ 35. FileManager in MUDGrinder now has file rename/move feature.
+ 36. New property: Prop_LimitedContents, for limiting the number of items of a type in a container or room
+ 
 # Build 5.9.8 Release 4/8/2019
   1. New skills: Informant, AutoSwipe, Find Clan Home, Find Clan Ship, Letter of Marque
   2. New wainwrighting & smelting recipes

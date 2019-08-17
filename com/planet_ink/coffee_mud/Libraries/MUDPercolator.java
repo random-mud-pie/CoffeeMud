@@ -5,6 +5,7 @@ import com.planet_ink.coffee_mud.core.*;
 import com.planet_ink.coffee_mud.core.collections.*;
 import com.planet_ink.coffee_mud.Abilities.interfaces.*;
 import com.planet_ink.coffee_mud.Areas.interfaces.*;
+import com.planet_ink.coffee_mud.Areas.interfaces.Area.State;
 import com.planet_ink.coffee_mud.Behaviors.interfaces.*;
 import com.planet_ink.coffee_mud.CharClasses.interfaces.*;
 import com.planet_ink.coffee_mud.Commands.interfaces.*;
@@ -202,6 +203,40 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 		}
 	}
 
+	//@Override
+	private void testSQLParsing()
+	{
+		final String[] testSqls = new String[] {
+			"SELECT: x from y",
+			"SELECT: x, XX from y",
+			"SELECT: x,xx,xxx from y",
+			"SELECT: x, xx , xxx from y",
+			"SELECT: x, xx , xxx from (select: x from y)",
+			"SELECT: x from y where x>y",
+			"SELECT: x from y where x >y",
+			"SELECT: x from y where x> y",
+			"SELECT: x from y where xxx> ydd and yyy<=djj",
+			"SELECT: x from y where xxx> ydd and yyy<=djj or zzz > jkkk and rrr>ddd",
+			"SELECT: x from (select: x from y) where (xxx > ydd) and ( yyy<=djj ) or (zzz > jkkk)and(rrr>ddd)",
+			"SELECT: x from y where ((xxx > ydd) and ( yyy<=djj )) or((zzz > jkkk)and ((rrr>ddd) or (ddd>888)))",
+		};
+		for(int i=0;i<testSqls.length;i++)
+		{
+			final String sqlWSelect=testSqls[i];
+			final int x=sqlWSelect.indexOf(':');
+			final String sql=sqlWSelect.substring(x+1).toUpperCase().trim();
+			try
+			{
+				final SQLClause clause = new SQLClause();
+				clause.parseSQL(testSqls[i], sql);
+			}
+			catch(final Exception e)
+			{
+				System.out.println(e.getMessage());
+			}
+		}
+	}
+
 	@Override
 	@SuppressWarnings("unchecked")
 	public boolean activate()
@@ -298,7 +333,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 		if(R == null)
 			throw new CMException("Unable to build room on classID '"+classID+"', Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
 		addDefinition("ROOM_CLASS",classID,defined);
-		final List<String> ignoreStats=new XVector<String>(new String[]{"CLASS","DISPLAY","DESCRIPTION"});
+		final List<String> ignoreStats=new XArrayList<String>(new String[]{"CLASS","DISPLAY","DESCRIPTION"});
 		fillOutRequiredStatCodeSafe(R, ignoreStats, "ROOM_", "TITLE", "DISPLAY", piece, defined);
 		fillOutRequiredStatCodeSafe(R, ignoreStats, "ROOM_", "DESCRIPTION", "DESCRIPTION", piece, defined);
 		fillOutCopyCodes(R, ignoreStats, "ROOM_", piece, defined);
@@ -629,7 +664,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 						{
 							if(node.links().get(Integer.valueOf(d))!=null)
 							{
-								final List<LayoutNode> grpCopy=new XVector<LayoutNode>(group);
+								final List<LayoutNode> grpCopy=new XArrayList<LayoutNode>(group);
 								final HashSet<LayoutNode> nodesAlreadyGroupedCopy=(HashSet<LayoutNode>)nodesAlreadyGrouped.clone();
 								layoutFollow(node,LayoutTypes.street,d,nodesAlreadyGroupedCopy,grpCopy);
 								if(node.links().get(Integer.valueOf(Directions.getOpDirectionCode(d)))!=null)
@@ -774,7 +809,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 		if((!CMath.isInteger(size))||(CMath.s_int(size)<=0))
 			throw new CMException("Unable to build area of size "+size);
 		defined.put("AREA_SIZE",size);
-		final List<String> ignoreStats=new XVector<String>(new String[]{"CLASS","NAME","DESCRIPTION","LAYOUT","SIZE"});
+		final List<String> ignoreStats=new XArrayList<String>(new String[]{"CLASS","NAME","DESCRIPTION","LAYOUT","SIZE"});
 		fillOutStatCodes(A, ignoreStats,"AREA_",piece,defined);
 
 		final List<Ability> aV = findAffects(A,piece,defined,null);
@@ -1064,8 +1099,17 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 					x+=2;
 					varstart+=2;
 				}
-				while((x<str.length())&&(str.charAt(x)!='}'))
+				int depth=0;
+				while((x<str.length())
+				&&((str.charAt(x)!='}')||(depth>0)))
+				{
+					if(str.charAt(x)=='{')
+						depth++;
+					else
+					if(str.charAt(x)=='}')
+						depth--;
 					x++;
+				}
 				var.var = str.substring(varstart+2,x);
 				if(x<str.length())
 					x++;
@@ -1076,8 +1120,17 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 			{
 				final int varstart=var.outerStart;
 				x++;
-				while((x<str.length())&&(str.charAt(x)!=']'))
+				int depth=0;
+				while((x<str.length())
+				&&((str.charAt(x)!=']')||(depth>0)))
+				{
+					if(str.charAt(x)=='[')
+						depth++;
+					else
+					if(str.charAt(x)==']')
+						depth--;
 					x++;
+				}
 				var.var = str.substring(varstart+2,x);
 				var.isMathExpression=true;
 				if(x<str.length())
@@ -1226,7 +1279,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 	{
 		final String classID = findStringNow("class",piece,defined);
 		MOB M = null;
-		final List<String> ignoreStats=new XVector<String>();
+		final List<String> ignoreStats=new XArrayList<String>();
 		boolean copyFilled = false;
 		if(classID.equalsIgnoreCase("catalog"))
 		{
@@ -1439,7 +1492,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 	// remember to check ROOMLINK_DIR for N,S,E,W,U,D,etc..
 	protected Exit buildExit(final XMLTag piece, final Map<String,Object> defined) throws CMException
 	{
-		final List<String> ignoreStats=new XVector<String>();
+		final List<String> ignoreStats=new XArrayList<String>();
 		final String classID = findStringNow("class",piece,defined);
 		final Exit E = CMClass.getExit(classID);
 		if(E == null)
@@ -1736,7 +1789,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 		final Map<String,Object> preContentDefined = new SHashtable<String,Object>(defined);
 		final String classID = findStringNow("class",piece,defined);
 		final List<Item> contents = new Vector<Item>();
-		final List<String> ignoreStats=new XVector<String>();
+		final List<String> ignoreStats=new XArrayList<String>();
 		final int senseFlag = CMath.s_bool(findOptionalStringNow(null,null,null,"nowear",piece,defined,false)) ? PhyStats.SENSE_ITEMNOAUTOWEAR : 0;
 		if(classID.toLowerCase().startsWith("metacraft"))
 		{
@@ -2244,7 +2297,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 		addDefinition("RACE_CLASS",R.ID(),defined); // define so we can mess with it
 		R.setStat("NAME", findStringNow("name",piece,defined));
 		addDefinition("RACE_NAME",R.name(),defined); // define so we can mess with it
-		final List<String> ignoreStats=new XVector<String>(new String[]{"CLASS","NAME"});
+		final List<String> ignoreStats=new XArrayList<String>(new String[]{"CLASS","NAME"});
 
 		final List<Item> raceWeapons=getRaceItems(E,"WEAPON","RACE_WEAPON_",piece,defined);
 		if(raceWeapons.size()>0)
@@ -2504,6 +2557,61 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 		final Object asDefined = defined.get(tagName);
 		if(asDefined instanceof String)
 			return (String)asDefined;
+
+		final String contentload = piece.getParmValue("CONTENT_LOAD");
+		if((contentload!=null)
+		&&(contentload.length()>0))
+		{
+			final CMFile file = new CMFile(contentload,null,CMFile.FLAG_LOGERRORS|CMFile.FLAG_FORCEALLOW);
+			if(file.exists() && file.canRead())
+				return strFilter(E, ignoreStats, defPrefix,file.text().toString(), piece, defined);
+			else
+				throw new CMException("Bad content_load filename in '"+tagName+"' on piece '"+piece.tag()+"', Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
+		}
+
+		String questTemplateLoad = piece.getParmValue("QUEST_TEMPLATE_ID");
+		if((questTemplateLoad!=null)
+		&&(questTemplateLoad.length()>0))
+		{
+			piece.parms().remove("QUEST_TEMPLATE_ID"); // once only, please
+			questTemplateLoad = strFilter(E,ignoreStats,defPrefix,questTemplateLoad,piece, defined);
+			final CMFile file = new CMFile(Resources.makeFileResourceName("quests/templates/"+questTemplateLoad.trim()+".quest"),null,CMFile.FLAG_LOGERRORS|CMFile.FLAG_FORCEALLOW);
+			if(file.exists() && file.canRead())
+			{
+				final String rawFileText = file.text().toString();
+				final int endX=rawFileText.lastIndexOf("#!QUESTMAKER_END_SCRIPT");
+				if(endX > 0)
+				{
+					final int lastCR = rawFileText.indexOf('\n', endX);
+					final int lastEOF = rawFileText.indexOf('\r', endX);
+					final int endScript = lastCR > endX ? (lastCR < lastEOF ? lastCR : lastEOF): lastEOF;
+					final List<String> wizList = Resources.getFileLineVector(new StringBuffer(rawFileText.substring(0, endScript).trim()));
+					String cleanedFileText = rawFileText.substring(endScript).trim();
+					for(final String wiz : wizList)
+					{
+						if(wiz.startsWith("#$"))
+						{
+							final int x=wiz.indexOf('=');
+							if(x>0)
+							{
+								final String var=wiz.substring(2,x);
+								if(cleanedFileText.indexOf(var)>0)
+								{
+									final String value=findStringNow(var, piece, defined);
+									cleanedFileText=CMStrings.replaceAll(cleanedFileText,var,value);
+								}
+							}
+						}
+					}
+					return cleanedFileText;
+				}
+				else
+					throw new CMException("Corrupt quest_template in '"+tagName+"' on piece '"+piece.tag()+"', Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
+			}
+			else
+				throw new CMException("Bad quest_template_id in '"+tagName+"' on piece '"+piece.tag()+"', Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
+		}
+
 		XMLTag processDefined=null;
 		if(asDefined instanceof XMLTag)
 		{
@@ -2913,30 +3021,61 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 			if((num<0)||(num>choices.size()))
 				throw new CMException("Can't pick "+num+" of "+choices.size()+" on piece '"+piece.tag()+"', Tag: "+tagName+", Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
 			selectedChoicesV=new Vector<XMLTag>();
-			final List<XMLLibrary.XMLTag> cV=new XVector<XMLLibrary.XMLTag>(choices);
+			final List<XMLLibrary.XMLTag> cV=new XArrayList<XMLLibrary.XMLTag>(choices);
+			final List<Integer> wV=new XArrayList<Integer>(choices.size(),true);
+			for(int c=0;c<cV.size();c++)
+			{
+				final XMLTag lilP=cV.get(c);
+				final String pickWeight=lilP.getParmValue("PICKWEIGHT");
+				final int weight;
+				if(pickWeight==null)
+					weight=0;
+				else
+				{
+					final String weightValue=strFilterNow(E,ignoreStats,defPrefix,pickWeight,piece, defined);
+					weight=CMath.s_parseIntExpression(weightValue);
+				}
+				if(weight < 0)
+				{
+					cV.remove(c);
+					c--;
+				}
+				else
+				{
+					wV.add(Integer.valueOf(weight));
+				}
+			}
 			for(int v=0;v<num;v++)
 			{
-				final int[] weights=new int[cV.size()];
 				int total=0;
 				for(int c=0;c<cV.size();c++)
+					total += wV.get(c).intValue();
+				if(total==0)
 				{
-					final XMLTag lilP=cV.get(c);
-					int weight=CMath.s_parseIntExpression(lilP.getParmValue("PICKWEIGHT"));
-					if(weight<1)
-						weight=1;
-					weights[c]=weight;
-					total+=weight;
+					if(cV.size()>0)
+					{
+						final int c=CMLib.dice().roll(1,cV.size(),-1);
+						selectedChoicesV.add(cV.get(c));
+						cV.remove(c);
+						wV.remove(c);
+					}
 				}
-
-				int choice=CMLib.dice().roll(1,total,0);
-				int c=-1;
-				while(choice>0)
+				else
 				{
-					c++;
-					choice-=weights[c];
+					int choice=CMLib.dice().roll(1,total,0);
+					int c=-1;
+					while(choice>0)
+					{
+						c++;
+						choice-=wV.get(c).intValue();
+					}
+					if((c>=0)&&(c<cV.size()))
+					{
+						selectedChoicesV.add(cV.get(c));
+						cV.remove(c);
+						wV.remove(c);
+					}
 				}
-				selectedChoicesV.add(cV.get(c));
-				cV.remove(c);
 			}
 		}
 		else
@@ -2949,7 +3088,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 			if((num<0)||(num>choices.size()))
 				throw new CMException("Can't pick last "+num+" of "+choices.size()+" on piece '"+piece.tag()+"', Tag: "+tagName+", Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
 			selectedChoicesV=new Vector<XMLTag>();
-			final List<XMLLibrary.XMLTag> cV=new XVector<XMLLibrary.XMLTag>(choices);
+			final List<XMLLibrary.XMLTag> cV=new XArrayList<XMLLibrary.XMLTag>(choices);
 			for(int v=0;v<num;v++)
 			{
 				final int x=CMLib.dice().roll(1,cV.size(),-1);
@@ -2964,7 +3103,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 			if(num<0)
 				throw new CMException("Can't pick last "+num+" of "+choices.size()+" on piece '"+piece.tag()+"', Tag: "+tagName+", Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
 			selectedChoicesV=new Vector<XMLTag>();
-			final List<XMLLibrary.XMLTag> cV=new XVector<XMLLibrary.XMLTag>(choices);
+			final List<XMLLibrary.XMLTag> cV=new XArrayList<XMLLibrary.XMLTag>(choices);
 			for(int v=0;v<num;v++)
 			{
 				final int x=CMLib.dice().roll(1,cV.size(),-1);
@@ -2978,7 +3117,7 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 			if((num<0)||(num>choices.size()))
 				throw new CMException("Can't pick any "+num+" of "+choices.size()+" on piece '"+piece.tag()+"', Tag: "+tagName+", Data: "+CMParms.toKeyValueSlashListString(piece.parms())+":"+CMStrings.limit(piece.value(),100));
 			selectedChoicesV=new Vector<XMLTag>();
-			final List<XMLLibrary.XMLTag> cV=new XVector<XMLLibrary.XMLTag>(choices);
+			final List<XMLLibrary.XMLTag> cV=new XArrayList<XMLLibrary.XMLTag>(choices);
 			for(int v=0;v<num;v++)
 			{
 				final int x=CMLib.dice().roll(1,cV.size(),-1);
@@ -3004,6 +3143,940 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 
 	}
 
+	private static enum SelectSQLState
+	{
+		STATE_SELECT0, // name
+		STATE_SELECT1, // as or from or ,
+		STATE_AS0, // as
+		STATE_AS1, // expect from or , ONLY
+		STATE_FROM0, // loc
+		STATE_FROM1, // paren
+		STATE_EXPECTWHEREOREND, // expect where
+		STATE_WHERE0, // object
+		STATE_WHERE1, // comparator
+		STATE_WHERE2, // object rhs
+		STATE_EXPECTCONNOREND, // expect connector or end of clause
+		STATE_WHEREEMBEDLEFT0, // got ( on left of comparator
+		STATE_WHEREEMBEDRIGHT0, // got ( on right of comparator
+		STATE_EXPECTNOTHING // end of where clause
+	}
+
+
+	/**
+	 * Class for semi-parsed SQLClause, including method
+	 * to do the parsig to fill out this object
+	 *
+	 * @author Bo Zimmerman
+	 *
+	 */
+	private static class SQLClause
+	{
+		/**
+		 * Connector descriptors for connecting sql where clauses together
+		 * @author Bo Zimmerman
+		 *
+		 */
+		private static enum WhereConnector { ENDCLAUSE, AND, OR }
+
+		/**
+		 * Connector descriptors for connecting sql where clauses together
+		 * @author Bo Zimmerman
+		 *
+		 */
+		private static enum WhereComparator { EQ, NEQ, GT, LT, GTEQ, LTEQ, LIKE, IN, NOTLIKE, NOTIN }
+
+		/** An abstract Where Clause
+		 * @author Bo Zimmerman
+		 *
+		 */
+		private static class WhereComp
+		{
+			private String			lhs		= null;
+			private WhereComparator	comp	= null;
+			private String			rhs		= null;
+		}
+
+		private static class WhereClause
+		{
+			private WhereClause		prev	= null;
+			private WhereClause		parent	= null;
+			private WhereClause		child	= null;
+			private WhereComp		lhs		= null;
+			private WhereConnector	conn	= null;
+			private WhereClause		next	= null;
+		}
+
+		private static class WhatBit extends Pair<String,String>
+		{
+			private WhatBit(final String what, final String as)
+			{
+				super(what,as);
+			}
+
+			private String what()
+			{
+				return first;
+			}
+
+			private String as()
+			{
+				return second;
+			}
+
+			@Override
+			public String toString()
+			{
+				if(first.equals(second))
+					return first;
+				return first+" as "+second;
+			}
+		}
+
+		private String				sql		= "";
+		private final List<WhatBit>	what	= new ArrayList<WhatBit>(1);
+		private String				from	= "";
+		private WhereClause			wheres	= null;
+
+		/**
+		 * parse the sql statement into this object
+		 *
+		 * @param str the original sql statement
+		 * @param sqlbits sql statement, minus select: must be ALL UPPERCASE
+		 * @throws CMException
+		 */
+		private void parseSQL(final String str, final String sqlbits) throws CMException
+		{
+			this.sql=str;
+			final StringBuilder curr=new StringBuilder("");
+			int pdepth=0;
+			WhereClause wheres = new WhereClause();
+			this.wheres=wheres;
+			WhereComp	wcomp  = null;
+			SelectSQLState state=SelectSQLState.STATE_SELECT0;
+			for(int i=0;i<=sqlbits.length();i++)
+			{
+				final char c=(i==sqlbits.length())?' ':sqlbits.charAt(i);
+				switch(state)
+				{
+				case STATE_SELECT0: // select state
+				{
+					if(Character.isWhitespace(c))
+					{
+						if(curr.length()>0)
+						{
+							// we just got a name symbol, so go to state 1 and expect AS or FROM or ,
+							what.add(new WhatBit(curr.toString(),curr.toString()));
+							state=SelectSQLState.STATE_SELECT1;
+							curr.setLength(0);
+						}
+					}
+					else
+					if(c==',')
+					{
+						if(curr.length()>0)
+						{
+							what.add(new WhatBit(curr.toString(),curr.toString()));
+							curr.setLength(0);
+						}
+						else
+							throw new CMException("Unexpected , in Malformed sql: "+str);
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_SELECT1: // expect AS or FROM or ,
+				{
+					if(Character.isWhitespace(c))
+					{
+						if(curr.length()>0)
+						{
+							if(curr.toString().equals("FROM"))
+							{
+								curr.setLength(0);
+								state=SelectSQLState.STATE_FROM0;
+							}
+							else
+							if(curr.toString().equals("AS"))
+							{
+								curr.setLength(0);
+								state=SelectSQLState.STATE_AS0;
+							}
+							else
+								throw new CMException("Unexpected select string in Malformed sql: "+str);
+						}
+					}
+					else
+					if(c==',')
+					{
+						if(curr.length()==0)
+							state=SelectSQLState.STATE_SELECT0;
+						else
+							throw new CMException("Unexpected , in Malformed sql: "+str);
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_AS0: // as name
+				{
+					if(Character.isWhitespace(c)
+					||(c==','))
+					{
+						if(curr.length()>0)
+						{
+							if(curr.toString().equals("FROM"))
+								throw new CMException("Unexpected FROM in Malformed sql: "+str);
+							else
+							if(curr.toString().equals("AS"))
+								throw new CMException("Unexpected AS in Malformed sql: "+str);
+							else
+							{
+								state=SelectSQLState.STATE_AS1; // expect from or , ONLY
+								what.get(what.size()-1).second = curr.toString();
+								curr.setLength(0);
+							}
+						}
+						else
+						if(c==',')
+							throw new CMException("Unexpected , in Malformed sql: "+str);
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_AS1: // expect FROM or , only
+				{
+					if(Character.isWhitespace(c))
+					{
+						if(curr.length()>0)
+						{
+							if(curr.toString().equals("FROM"))
+							{
+								curr.setLength(0);
+								state=SelectSQLState.STATE_FROM0;
+							}
+							else
+								throw new CMException("Unexpected name string in Malformed sql: "+str);
+						}
+					}
+					else
+					if(c==',')
+					{
+						if(curr.length()==0)
+							state=SelectSQLState.STATE_SELECT0;
+						else
+							throw new CMException("Unexpected , in Malformed sql: "+str);
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_FROM0: // from state
+				{
+					if(Character.isWhitespace(c))
+					{
+						if(curr.length()>0)
+						{
+							if(curr.toString().equals("WHERE"))
+								throw new CMException("Unexpected WHERE in Malformed sql: "+str);
+							else
+							{
+								from=curr.toString();
+								curr.setLength(0);
+								state=SelectSQLState.STATE_EXPECTWHEREOREND; // now expect where
+							}
+						}
+					}
+					else
+					if(c=='(')
+					{
+						if(curr.length()==0)
+							state=SelectSQLState.STATE_FROM1;
+						else
+							throw new CMException("Unexpected ( in Malformed sql: "+str);
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_FROM1: // from () state
+				{
+					if(c=='(')
+						pdepth++;
+					else
+					if(c==')')
+					{
+						if(pdepth==0)
+						{
+							from=curr.toString();
+							state=SelectSQLState.STATE_EXPECTWHEREOREND; // expect where
+							curr.setLength(0);
+						}
+						else
+							pdepth--;
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_EXPECTWHEREOREND: // expect where clause
+				{
+					if(Character.isWhitespace(c))
+					{
+						if(curr.length()>0)
+						{
+							if(curr.toString().equals(";"))
+							{
+								curr.setLength(0);
+								state=SelectSQLState.STATE_EXPECTNOTHING;
+							}
+							else
+							if(!curr.toString().equals("WHERE"))
+								throw new CMException("Eexpected WHERE in Malformed sql: "+str);
+							else
+							{
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE0;
+							}
+						}
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_WHERE0: // initial where state
+				{
+					if(Character.isWhitespace(c)
+					||("<>!=".indexOf(c)>=0))
+					{
+						if(curr.length()>0)
+						{
+							wcomp=new WhereComp();
+							if(wheres.lhs!=null)
+							{
+								final WhereClause newClause = new WhereClause();
+								newClause.prev=wheres;
+								wheres.next=newClause;
+								wheres=newClause;
+							}
+							wheres.lhs=wcomp;
+							wcomp.lhs = curr.toString();
+							curr.setLength(0);
+							if(!Character.isWhitespace(c))
+								curr.append(c);
+							state=SelectSQLState.STATE_WHERE1; // now expect comparator
+						}
+					}
+					else
+					if(c=='(')
+					{
+						if(curr.length()==0)
+							state=SelectSQLState.STATE_WHEREEMBEDLEFT0;
+						else
+							throw new CMException("Unexpected ( in Malformed sql: "+str);
+					}
+					else
+					if(c==')')
+						throw new CMException("Unexpected ) in Malformed sql: "+str);
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_WHEREEMBEDLEFT0:
+				{
+					if(c=='(')
+					{
+						if(curr.length()==0)
+						{
+							final WhereClause priorityClause = new WhereClause();
+							if(wheres.parent != null)
+							{
+								final WhereClause dummyClause = new WhereClause();
+								wheres.next=dummyClause;
+								dummyClause.prev=wheres;
+								wheres=dummyClause;
+							}
+							priorityClause.child=wheres;
+							wheres.parent=priorityClause;
+							wheres=priorityClause;
+							i--;
+							state=SelectSQLState.STATE_WHERE0; // expect lhs of a comp
+						}
+						else
+							pdepth++;
+					}
+					else
+					if(c==')')
+					{
+						if(pdepth==0)
+						{
+							wcomp=new WhereComp();
+							if(wheres.lhs!=null)
+							{
+								final WhereClause newClause = new WhereClause();
+								wheres.next=newClause;
+								newClause.prev=wheres;
+								wheres=newClause;
+							}
+							wheres.lhs=wcomp;
+							wcomp.lhs=curr.toString();
+							state=SelectSQLState.STATE_WHERE1; // expect connector or endofclause
+							curr.setLength(0);
+						}
+						else
+							pdepth--;
+					}
+					else
+					if(Character.isWhitespace(c) && (curr.length()==0))
+					{}
+					else
+					{
+						curr.append(c);
+						if((curr.length()<8)
+						&&(!"SELECT:".startsWith(curr.toString())))
+						{
+							final WhereClause priorityClause = new WhereClause();
+							if(wheres.parent != null)
+							{
+								final WhereClause dummyClause = new WhereClause();
+								wheres.next=dummyClause;
+								dummyClause.prev=wheres;
+								wheres=dummyClause;
+							}
+							priorityClause.child=wheres;
+							wheres.parent=priorityClause;
+							wheres=priorityClause;
+							i=sqlbits.lastIndexOf('(',i);
+							curr.setLength(0);
+							state=SelectSQLState.STATE_WHERE0; // expect lhs of a comp
+						}
+					}
+					break;
+				}
+				case STATE_WHERE1: // expect comparator
+				{
+					if(curr.length()==0)
+					{
+						if(!Character.isWhitespace(c))
+							curr.append(c);
+					}
+					else
+					{
+						boolean saveC = false;
+						boolean done=false;
+						if("<>!=".indexOf(c)>=0)
+						{
+							if("<>!=".indexOf(curr.charAt(0))>=0)
+							{
+								curr.append(c);
+								done=curr.length()>=2;
+							}
+							else
+								throw new CMException("Unexpected '"+c+"' in Malformed sql: "+str);
+						}
+						else
+						if(!Character.isWhitespace(c))
+						{
+							if("<>!=".indexOf(curr.charAt(0))>=0)
+							{
+								saveC=true;
+								done=true;
+							}
+							else
+								curr.append(c);
+						}
+						else
+							done=true;
+						if(done)
+						{
+							final String fcurr=curr.toString();
+							if(fcurr.equals("="))
+							{
+								wcomp.comp=WhereComparator.EQ;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals("!=")||fcurr.equals("<>"))
+							{
+								wcomp.comp=WhereComparator.NEQ;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals(">"))
+							{
+								wcomp.comp=WhereComparator.GT;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals("<"))
+							{
+								wcomp.comp=WhereComparator.LT;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals(">=")||fcurr.equals("=>"))
+							{
+								wcomp.comp=WhereComparator.GTEQ;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals("<=")||fcurr.equals("<="))
+							{
+								wcomp.comp=WhereComparator.LTEQ;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals("IN"))
+							{
+								wcomp.comp=WhereComparator.IN;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals("LIKE"))
+							{
+								wcomp.comp=WhereComparator.LIKE;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals("NOTIN"))
+							{
+								wcomp.comp=WhereComparator.NOTIN;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+							if(fcurr.equals("NOTLIKE"))
+							{
+								wcomp.comp=WhereComparator.NOTLIKE;
+								curr.setLength(0);
+								state=SelectSQLState.STATE_WHERE2; // now expect RHS
+							}
+							else
+								throw new CMException("Unexpected '"+fcurr+"' in Malformed sql: "+str);
+							if(saveC)
+								curr.append(c);
+						}
+					}
+					break;
+				}
+				case STATE_WHERE2: // where rhs of clause
+				{
+					if(Character.isWhitespace(c))
+					{
+						if(curr.length()>0)
+						{
+							wcomp.rhs=curr.toString();
+							curr.setLength(0);
+							state=SelectSQLState.STATE_EXPECTCONNOREND;
+						}
+					}
+					else
+					if(c==')')
+					{
+						if(curr.length()==0)
+							throw new CMException("Unexpected ): Malformed sql: "+str);
+						wcomp.rhs=curr.toString();
+						curr.setLength(0);
+						while(wheres.prev!=null)
+							wheres=wheres.prev;
+						if(wheres.child==null)
+							throw new CMException("Unexpected ): Malformed sql: "+str);
+						wheres=wheres.child;
+						state=SelectSQLState.STATE_EXPECTCONNOREND;
+					}
+					else
+					if(c==';')
+					{
+						if(curr.length()==0)
+							throw new CMException("Unexpected ; in Malformed sql: "+str);
+						else
+						{
+							wcomp.rhs=curr.toString();
+							curr.setLength(0);
+							state=SelectSQLState.STATE_EXPECTNOTHING;
+						}
+					}
+					else
+					if(c=='(')
+					{
+						if(curr.length()==0)
+							state=SelectSQLState.STATE_WHEREEMBEDRIGHT0;
+						else
+							throw new CMException("Unexpected ( in Malformed sql: "+str);
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_WHEREEMBEDRIGHT0:
+				{
+					if(c=='(')
+					{
+						pdepth++;
+					}
+					else
+					if(c==')')
+					{
+						if(pdepth==0)
+						{
+							wcomp.rhs=curr.toString();
+							state=SelectSQLState.STATE_EXPECTCONNOREND; // expect connector or endofclause
+							curr.setLength(0);
+						}
+						else
+							pdepth--;
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				case STATE_EXPECTCONNOREND: // expect connector or endofclause
+				{
+					//TODO: connector might mean replacing rhs of current wheres with new wheres
+					if(c==';')
+					{
+						state=SelectSQLState.STATE_EXPECTNOTHING;
+					}
+					else
+					if(Character.isWhitespace(c) || (c=='('))
+					{
+						if(curr.length()>0)
+						{
+							if(curr.toString().equals("AND"))
+							{
+								wheres.conn = WhereConnector.AND;
+								state=SelectSQLState.STATE_WHERE0;
+								curr.setLength(0);
+								if(c=='(')
+									i--;
+							}
+							else
+							if(curr.toString().equals("OR"))
+							{
+								wheres.conn = WhereConnector.OR;
+								state=SelectSQLState.STATE_WHERE0;
+								curr.setLength(0);
+								if(c=='(')
+									i--;
+							}
+							else
+								throw new CMException("Unexpected '"+curr.toString()+"': Malformed sql: "+str);
+						}
+						else
+						if(c=='(')
+							throw new CMException("Unexpected ): Malformed sql: "+str);
+					}
+					else
+					if((c==')') && (curr.length()==0))
+					{
+						while(wheres.prev!=null)
+							wheres=wheres.prev;
+						if(wheres.child==null)
+							throw new CMException("Unexpected ): Malformed sql: "+str);
+						wheres=wheres.child;
+					}
+					else
+						curr.append(c);
+					break;
+				}
+				default:
+					if(!Character.isWhitespace(c))
+						throw new CMException("Unexpected '"+c+"': Malformed sql: "+str);
+					break;
+				}
+			}
+			if((state != SelectSQLState.STATE_EXPECTNOTHING)
+			&&(state != SelectSQLState.STATE_EXPECTWHEREOREND)
+			&&(state != SelectSQLState.STATE_EXPECTCONNOREND))
+				throw new CMException("Unpected end of clause in state "+state.toString()+" in sql: "+str);
+		}
+	}
+
+	protected void doneWithSQLObject(final Object o)
+	{
+		if(o instanceof Physical)
+		{
+			final Physical P=(Physical)o;
+			if(!P.isSavable())
+			{
+				if((P instanceof DBIdentifiable)
+				&&(((DBIdentifiable)P).databaseID().equals("DELETE")))
+					P.destroy();
+				else
+				if((P instanceof Area)
+				&&(((Area)P).getAreaState()==Area.State.STOPPED))
+					P.destroy();
+				else
+				if((P instanceof Room)
+				&&(((Room)P).getArea().amDestroyed()))
+					P.destroy();
+			}
+		}
+	}
+
+	protected List<Object> parseSQLCMFile(final CMFile F, final String sql) throws CMException
+	{
+		final List<Object> from=new LinkedList<Object>();
+		String str=F.text().toString().trim();
+		// normalize singletons
+		if(str.startsWith("<MOB>"))
+			str="<MOBS>"+str+"</MOB>";
+		else
+		if(str.startsWith("<ITEM>"))
+			str="<ITEMS>"+str+"</ITEMS>";
+		else
+		if(str.startsWith("<AREA>"))
+			str="<AREAS>"+str+"</AREAS>";
+
+		if(str.startsWith("<MOBS>"))
+		{
+			final List<MOB> mobList=new LinkedList<MOB>();
+			final String err = CMLib.coffeeMaker().addMOBsFromXML(str, mobList, null);
+			if((err!=null)&&(err.length()>0))
+				throw new CMException("CMFile "+F.getAbsolutePath()+" failed mob parsing '"+err+"' in "+sql);
+			for(final MOB M : mobList)
+			{
+				CMLib.threads().deleteAllTicks(M);
+				M.setSavable(false);
+				M.setDatabaseID("DELETE");
+			}
+			from.addAll(mobList);
+		}
+		else
+		if(str.startsWith("<ITEMS>"))
+		{
+			final List<Item> itemList=new LinkedList<Item>();
+			final String err = CMLib.coffeeMaker().addItemsFromXML(str, itemList, null);
+			if((err!=null)&&(err.length()>0))
+				throw new CMException("CMFile "+F.getAbsolutePath()+" failed item parsing '"+err+"' in "+sql);
+			for(final Item I : itemList)
+			{
+				CMLib.threads().deleteAllTicks(I);
+				I.setSavable(false);
+				I.setDatabaseID("DELETE");
+			}
+			from.addAll(itemList);
+		}
+		else
+		if(str.startsWith("<AREAS>"))
+		{
+			final List<Area> areaList=new LinkedList<Area>();
+			final List<List<XMLLibrary.XMLTag>> areas=new ArrayList<List<XMLLibrary.XMLTag>>();
+			String err=CMLib.coffeeMaker().fillAreasVectorFromXML(str,areas,null,null);
+			if((err!=null)&&(err.length()>0))
+				throw new CMException("CMFile "+F.getAbsolutePath()+" failed area parsing '"+err+"' in "+sql);
+			for(final List<XMLLibrary.XMLTag> area : areas)
+				err=CMLib.coffeeMaker().unpackAreaFromXML(area, null, null, true, false);
+			for(final Area A : areaList)
+			{
+				CMLib.threads().deleteAllTicks(A);
+				A.setSavable(false);
+				A.setAreaState(State.STOPPED);
+			}
+			from.addAll(areaList);
+		}
+		else
+		if(str.startsWith("<AROOM>"))
+		{
+			final List<Room> roomList=new LinkedList<Room>();
+			final Area dumbArea=CMClass.getAreaType("StdArea");
+			CMLib.flags().setSavable(dumbArea, false);
+			final List<XMLLibrary.XMLTag> tags=CMLib.xml().parseAllXML(str);
+			final String err=CMLib.coffeeMaker().unpackRoomFromXML(dumbArea, tags, true, false);
+			if((err!=null)&&(err.length()>0)||(!dumbArea.getProperMap().hasMoreElements()))
+				throw new CMException("CMFile "+F.getAbsolutePath()+" failed room parsing '"+err+"' in "+sql);
+			roomList.add(dumbArea.getProperMap().nextElement());
+			for(final Room R : roomList)
+			{
+				CMLib.threads().deleteAllTicks(R);
+				dumbArea.delProperRoom(R);
+				R.setSavable(false);
+			}
+			dumbArea.destroy();
+			from.addAll(roomList);
+		}
+		else
+			throw new CMException("CMFile "+F.getAbsolutePath()+" not selectable from in "+sql);
+		return from;
+	}
+
+	protected List<Object> parseSQLFrom(final String fromClause, final String sql, final Modifiable E, final List<String> ignoreStats, final String defPrefix, final XMLTag piece, final Map<String,Object> defined) throws CMException,PostProcessException
+	{
+		final List<Object> from=new LinkedList<Object>();
+		// clauses:
+		// imported physicalagents of all sorts
+		// world map
+		for(final String f : fromClause.split("\\"))
+		{
+			if(f.startsWith("/")
+			|| f.startsWith("::")
+			|| f.startsWith("//"))
+			{
+				final CMFile F=new CMFile(f,null);
+				if(!F.exists())
+					throw new CMException("CMFile "+f+" not found in "+sql);
+				if(F.isDirectory())
+				{
+					for(final CMFile F2 : F.listFiles())
+					{
+						if(!F2.isDirectory())
+							from.addAll(this.parseSQLCMFile(F, sql));
+					}
+				}
+				else
+					from.addAll(this.parseSQLCMFile(F, sql));
+			}
+			else
+			if(f.equals("AREAS"))
+			{
+				if(from.size()==0)
+					from.addAll(new XVector<Area>(CMLib.map().areas()));
+				else
+				{
+					final List<Object> oldFrom=new LinkedList<Object>();
+					oldFrom.addAll(from);
+					from.clear();
+					for(final Object o : oldFrom)
+					{
+						final Area A;
+						if (o instanceof CMObject)
+							A=CMLib.map().areaLocation((CMObject)o);
+						else
+							A=null;
+						if(A==null)
+							throw new CMException("Unknown sub-from "+f+" on "+o.toString()+" in "+sql);
+						else
+						if(!from.contains(A))
+							from.add(A);
+					}
+				}
+			}
+			else
+			if(f.equals("ROOMS"))
+			{
+				if(from.size()==0)
+					from.addAll(new XVector<Room>(CMLib.map().rooms()));
+				else
+				{
+					final List<Object> oldFrom=new LinkedList<Object>();
+					oldFrom.addAll(from);
+					from.clear();
+					for(final Object o : oldFrom)
+					{
+						final Room R;
+						if(o instanceof Area)
+						{
+							from.addAll(new XVector<Room>(((Area)o).getProperMap()));
+							continue;
+						}
+						if (o instanceof Environmental)
+							R=CMLib.map().roomLocation((Environmental)o);
+						else
+							R=null;
+						if(R==null)
+							throw new CMException("Unknown sub-from "+f+" on "+o.toString()+" in "+sql);
+						else
+						if(!from.contains(R))
+							from.add(R);
+					}
+				}
+			}
+			else
+			if(f.equals("AREA"))
+			{
+				if(from.size()==0)
+				{
+					//TODO: discover the CORRECT area
+				}
+				else
+				{
+					final List<Object> oldFrom=new LinkedList<Object>();
+					oldFrom.addAll(from);
+					from.clear();
+					for(final Object o : oldFrom)
+					{
+						final Room R;
+						if(o instanceof Area)
+						{
+							from.addAll(new XVector<Room>(((Area)o).getProperMap()));
+							continue;
+						}
+						if (o instanceof Environmental)
+							R=CMLib.map().roomLocation((Environmental)o);
+						else
+							R=null;
+						if(R==null)
+							throw new CMException("Unknown sub-from "+f+" on "+o.toString()+" in "+sql);
+						else
+						if(!from.contains(R))
+							from.add(R);
+					}
+				}
+			}
+			else //TODO: add MOBS, ITEMS, EQUIPMENT (for mobs), OWNER (for items), ROOM (correct room?), MOB (correct mob?), item (correct item?)
+				throw new CMException("Unknown from clause "+f+" in "+sql);
+		}
+		return from;
+	}
+
+	protected List<Map<String,Object>> doSubObjSelect(final Modifiable E, final List<String> ignoreStats, final String defPrefix, final SQLClause clause, final XMLTag piece, final Map<String,Object> defined) throws CMException,PostProcessException
+	{
+		final List<Map<String,Object>> results=new ArrayList<Map<String,Object>>();
+		// first estalish the from object
+		if(clause.from.length()==0)
+			throw new CMException("No FROM clause in "+clause.sql);
+		final List<Object> froms=this.parseSQLFrom(clause.from, clause.sql, E, ignoreStats, defPrefix, piece, defined);
+		//TODO: filter by the WHERE clause
+		//TODO: finally, select the WHATS
+		return results;
+	}
+
+	protected List<Map<String,String>> doSubSelect(final Modifiable E, final List<String> ignoreStats, final String defPrefix, final SQLClause clause, final XMLTag piece, final Map<String,Object> defined) throws CMException,PostProcessException
+	{
+		final List<Map<String,String>> results=new ArrayList<Map<String,String>>();
+		final List<Map<String, Object>> objs=this.doSubObjSelect(E, ignoreStats, defPrefix, clause, piece, defined);
+		for(final Map<String,Object> o : objs)
+		{
+			final Map<String,String> n=new TreeMap<String,String>();
+			results.add(n);
+			for(final String key : o.keySet())
+				n.put(key, o.get(key).toString());
+		}
+		return results;
+	}
+
+	protected List<Map<String,String>> doSubSelect(final Modifiable E, final List<String> ignoreStats, final String defPrefix, final String str, final XMLTag piece, final Map<String,Object> defined) throws CMException,PostProcessException
+	{
+		final int x=str.indexOf(':');
+		if(x<0)
+			throw new CMException("Malformed sql: "+str);
+		final String sqlbits=str.substring(x+1).toUpperCase();
+		final SQLClause clause = new SQLClause();
+		clause.parseSQL(str, sqlbits);
+		return this.doSubSelect(E, ignoreStats, defPrefix, clause, piece, defined);
+	}
+
+	protected String doSelectString(final Modifiable E, final List<String> ignoreStats, final String defPrefix, final String str, final XMLTag piece, final Map<String,Object> defined) throws CMException,PostProcessException
+	{
+		final List<Map<String,String>> res=doSubSelect(E,ignoreStats,defPrefix,str,piece,defined);
+		final StringBuilder finalStr = new StringBuilder("");
+		for(final Map<String,String> map : res)
+		{
+			for(final String key : map.keySet())
+				finalStr.append(map.get(key)).append(" ");
+		}
+		return finalStr.toString().trim();
+	}
+
 	protected String strFilter(Modifiable E, final List<String> ignoreStats, final String defPrefix, String str, final XMLTag piece, final Map<String,Object> defined) throws CMException,PostProcessException
 	{
 		List<Varidentifier> vars=parseVariables(str);
@@ -3024,6 +4097,11 @@ public class MUDPercolator extends StdLibrary implements AreaGenerationLibrary
 				}
 				else
 					throw new CMException("Invalid math expression '$"+expression+"' in str '"+str+"'");
+			}
+			else
+			if(V.var.toUpperCase().startsWith("SELECT:"))
+			{
+				val=doSelectString(E,ignoreStats,defPrefix,V.var,piece, defined);
 			}
 			else
 			if(V.var.toUpperCase().startsWith("STAT:") && (E!=null))

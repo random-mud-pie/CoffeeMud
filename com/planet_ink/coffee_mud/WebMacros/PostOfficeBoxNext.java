@@ -72,7 +72,9 @@ public class PostOfficeBoxNext extends StdWebMacro
 		if(CMSecurity.isAllowedEverywhere(M, CMSecurity.SecFlag.CMDPLAYERS))
 		{
 			postalBoxes=CMLib.database().DBReadPlayerDataAuthorsBySection(chain);
+			postalBoxes.remove(chain);
 			postalBoxes.add(0, chain);
+			httpReq.getRequestObjects().put("POSTAL_BOXES_"+chain, postalBoxes);
 		}
 		else
 		{
@@ -81,16 +83,19 @@ public class PostOfficeBoxNext extends StdWebMacro
 			for(final Pair<Clan,Integer> C : M.clans())
 			{
 				if(C.first.getAuthority(C.second.intValue(),Function.WITHDRAW)!=Authority.CAN_NOT_DO)
-					postalBoxes.add(C.first.name());
+				{
+					if(!postalBoxes.contains(C.first.name()))
+						postalBoxes.add(C.first.name());
+				}
 			}
+			httpReq.getRequestObjects().put("POSTAL_BOXES_"+chain, postalBoxes);
 		}
 		String lastID="";
 		for(final String postalBox : postalBoxes)
 		{
 			if((last==null)
 			||((last.length()>0)
-				&&(last.equals(lastID))
-				&&(!postalBox.equals(lastID))))
+				&&(last.equals(lastID))))
 			{
 				httpReq.addFakeUrlParameter("POSTBOX",postalBox);
 				last=postalBox;

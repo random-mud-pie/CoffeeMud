@@ -746,11 +746,8 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 		{
 			final String oldName=E.Name();
 			E.setName(newName);
-			if(E.displayText().equalsIgnoreCase(oldName+" stands here."))
-				E.setDisplayText(L("@x1 stands here.",newName));
-			else
-			if(E.displayText().equalsIgnoreCase(oldName+" sits here."))
-				E.setDisplayText(L("@x1 sits here.",newName));
+			if(E.displayText().toLowerCase().startsWith(oldName.toLowerCase()))
+				E.setDisplayText(newName+E.displayText().substring(oldName.length()));
 			return;
 		}
 		if((E instanceof Physical)&&(CMLib.flags().isCataloged(E)))
@@ -1220,14 +1217,15 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 			}
 			CMLib.threads().deleteTick(oldR,-1);
 			R.setRoomID(oldR.roomID());
-			final Area A=oldR.getArea();
-			if(A!=null)
-				A.delProperRoom(oldR);
-			R.setArea(A);
 			for(int d=0;d<R.rawDoors().length;d++)
 				R.rawDoors()[d]=oldR.rawDoors()[d];
 			for(int d=Directions.NUM_DIRECTIONS()-1;d>=0;d--)
 				R.setRawExit(d,oldR.getRawExit(d));
+			final Area A=oldR.getArea();
+			if(A!=null)
+				A.delProperRoom(oldR);
+			R.setSavable(oldR.getArea().isSavable() && oldR.isSavable());
+			R.setArea(A);
 			R.setDisplayText(oldR.displayText());
 			R.setDescription(oldR.description());
 			if(R.image().equalsIgnoreCase(CMLib.protocol().getDefaultMXPImage(oldR)))
@@ -1238,7 +1236,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				((GridLocale)R).setYGridSize(((GridLocale)oldR).yGridSize());
 				((GridLocale)R).clearGrid(null);
 			}
-			final Vector<MOB> allmobs=new Vector<MOB>();
+			final List<MOB> allmobs=new ArrayList<MOB>();
 			int skip=0;
 			while(oldR.numInhabitants()>(skip))
 			{
@@ -1246,7 +1244,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				if(M.isSavable())
 				{
 					if(!allmobs.contains(M))
-						allmobs.addElement(M);
+						allmobs.add(M);
 					oldR.delInhabitant(M);
 				}
 				else
@@ -1258,18 +1256,18 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				else
 					skip++;
 			}
-			final Vector<Item> allitems=new Vector<Item>();
+			final List<Item> allitems=new ArrayList<Item>();
 			while(oldR.numItems()>0)
 			{
 				final Item I=oldR.getItem(0);
 				if(!allitems.contains(I))
-					allitems.addElement(I);
+					allitems.add(I);
 				oldR.delItem(I);
 			}
 
 			for(int i=0;i<allitems.size();i++)
 			{
-				final Item I=allitems.elementAt(i);
+				final Item I=allitems.get(i);
 				if(!R.isContent(I))
 				{
 					if(I.subjectToWearAndTear())
@@ -1281,7 +1279,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 			}
 			for(int m=0;m<allmobs.size();m++)
 			{
-				final MOB M=allmobs.elementAt(m);
+				final MOB M=allmobs.get(m);
 				if(!R.isInhabitant(M))
 				{
 					final MOB M2=(MOB)M.copyOf();
@@ -1303,6 +1301,19 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 
 			try
 			{
+				for(final Enumeration<Room> r=R.getArea().getFilledProperMap();r.hasMoreElements();)
+				{
+					final Room R2=r.nextElement();
+					for(int d=0;d<R2.rawDoors().length;d++)
+					{
+						if(R2.rawDoors()[d]==oldR)
+						{
+							R2.rawDoors()[d]=R;
+							if(R2 instanceof GridLocale)
+								((GridLocale)R2).buildGrid();
+						}
+					}
+				}
 				for(final Enumeration<Room> r=CMLib.map().rooms();r.hasMoreElements();)
 				{
 					final Room R2=r.nextElement();
@@ -1343,10 +1354,14 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				else
 					R.addNonUninvokableEffect((Ability)oldBehavsNEffects.elementAt(i));
 			}
-			CMLib.database().DBUpdateRoom(R);
-			CMLib.database().DBUpdateMOBs(R);
-			CMLib.database().DBUpdateItems(R);
+			if(R.isSavable())
+			{
+				CMLib.database().DBUpdateRoom(R);
+				CMLib.database().DBUpdateMOBs(R);
+				CMLib.database().DBUpdateItems(R);
+			}
 			oldR.destroy();
+			R.giveASky(0);
 			R.getArea().addProperRoom(R); // necessary because of the destroy
 			R.setImage(R.rawImage());
 			R.startItemRejuv();
@@ -2274,7 +2289,8 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 					 PhyStats.IS_SNEAKING,
 					 PhyStats.IS_SWIMMING,
 					 PhyStats.IS_EVIL,
-					 PhyStats.IS_GOOD};
+					 PhyStats.IS_GOOD,
+					 PhyStats.IS_UNATTACKABLE};
 		final String[] briefs={"invisible",
 						 "hide",
 						 "unseen",
@@ -2286,7 +2302,8 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 						 "sneak",
 						 "swimmer",
 						 "evil",
-						 "good"};
+						 "good",
+						 "unattackable"};
 		if((showFlag!=showNumber)&&(showFlag>-999))
 		{
 			final StringBuffer buf=new StringBuffer(showNumber+". Dispositions: ");
@@ -6929,7 +6946,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 		{
 			final StringBuffer parts=new StringBuffer("");
 			final int numResources=CMath.s_int(E.getStat("NUMOFT"));
-			final Vector<Item> V=new Vector<Item>();
+			final List<Item> V=new ArrayList<Item>();
 			for(int v=0;v<numResources;v++)
 			{
 				final Item I=CMClass.getItem(E.getStat("GETOFTID"+v));
@@ -6938,7 +6955,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 					I.setMiscText(E.getStat("GETOFTPARM"+v));
 					I.recoverPhyStats();
 					parts.append(I.name()+", ");
-					V.addElement(I);
+					V.add(I);
 				}
 			}
 			if(parts.toString().endsWith(", "))
@@ -6955,7 +6972,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				int partNum=-1;
 				for(int i=0;i<V.size();i++)
 				{
-					if(CMLib.english().containsString(V.elementAt(i).name(),newName))
+					if(CMLib.english().containsString(V.get(i).name(),newName))
 					{
 						partNum = i;
 						break;
@@ -6972,7 +6989,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 						if(I!=null)
 						{
 							I=(Item)I.copyOf();
-							V.addElement(I);
+							V.add(I);
 							mob.tell(L("@x1 added.",I.name()));
 							updateList=true;
 						}
@@ -6981,8 +6998,8 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				}
 				else
 				{
-					final Item I=V.elementAt(partNum);
-					V.removeElementAt(partNum);
+					final Item I=V.get(partNum);
+					V.remove(partNum);
 					mob.tell(L("@x1 removed.",I.name()));
 					updateList=true;
 				}
@@ -6990,9 +7007,9 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				{
 					E.setStat("NUMOFT","");
 					for(int i=0;i<V.size();i++)
-						E.setStat("GETOFTID"+i,V.elementAt(i).ID());
+						E.setStat("GETOFTID"+i,V.get(i).ID());
 					for(int i=0;i<V.size();i++)
-						E.setStat("GETOFTPARM"+i,V.elementAt(i).text());
+						E.setStat("GETOFTPARM"+i,V.get(i).text());
 				}
 			}
 			else
@@ -7012,7 +7029,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 		{
 			final StringBuffer parts=new StringBuffer("");
 			final int numResources=CMath.s_int(E.getStat("NUMOFT"));
-			final Vector<Item> V=new Vector<Item>();
+			final List<Item> V=new ArrayList<Item>();
 			for(int v=0;v<numResources;v++)
 			{
 				final Item I=CMClass.getItem(E.getStat("GETOFTID"+v));
@@ -7021,7 +7038,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 					I.setMiscText(E.getStat("GETOFTPARM"+v));
 					I.recoverPhyStats();
 					parts.append(I.name()+", ");
-					V.addElement(I);
+					V.add(I);
 				}
 			}
 			if(parts.toString().endsWith(", "))
@@ -7038,7 +7055,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				int partNum=-1;
 				for(int i=0;i<V.size();i++)
 				{
-					if(CMLib.english().containsString(V.elementAt(i).name(),newName))
+					if(CMLib.english().containsString(V.get(i).name(),newName))
 					{
 						partNum = i;
 						break;
@@ -7055,7 +7072,7 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 						if(I!=null)
 						{
 							I=(Item)I.copyOf();
-							V.addElement(I);
+							V.add(I);
 							mob.tell(L("@x1 added.",I.name()));
 							updateList=true;
 						}
@@ -7064,8 +7081,8 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				}
 				else
 				{
-					final Item I=V.elementAt(partNum);
-					V.removeElementAt(partNum);
+					final Item I=V.get(partNum);
+					V.remove(partNum);
 					mob.tell(L("@x1 removed.",I.name()));
 					updateList=true;
 				}
@@ -7073,9 +7090,9 @@ public class CMGenEditor extends StdLibrary implements GenericEditor
 				{
 					E.setStat("NUMOFT","");
 					for(int i=0;i<V.size();i++)
-						E.setStat("GETOFTID"+i,V.elementAt(i).ID());
+						E.setStat("GETOFTID"+i,V.get(i).ID());
 					for(int i=0;i<V.size();i++)
-						E.setStat("GETOFTPARM"+i,V.elementAt(i).text());
+						E.setStat("GETOFTPARM"+i,V.get(i).text());
 				}
 			}
 			else

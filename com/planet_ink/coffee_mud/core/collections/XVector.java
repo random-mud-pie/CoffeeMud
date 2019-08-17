@@ -20,9 +20,7 @@ import java.util.*;
  */
 
 /*
- * A version of the Vector class that provides to "safe" adds
- * and removes by copying the underlying vector whenever those
- * operations are done.
+ * A version of the Vector class with better constructors
  */
 public class XVector<T> extends Vector<T>
 {

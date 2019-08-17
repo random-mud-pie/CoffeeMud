@@ -406,7 +406,7 @@ VIGOPREP@x1=Creative Food Prep @x2,10,X4,-SKILL +FoodPrep +MasterFoodPrep,-MAXCL
 HELP_=<EXPERTISE>The ability to prep foods that fortify movement.
 DATA_=Least,Lesser,Minor,Moderate,Great,Incredibe,Major,Wonderful,Super,Ultimate
 
-ADVNCRAFT@x1=Advanced Crafting @x2,3,LEVEL,-SKILLFLAG "+CRAFTING&!NATURE_LORE",-MAXCLASSLEVEL +>={1+(20*@x1)},+WIS {10+(4*@x1)} +INT {10+(4*@x1)},0,2,0,0,0
+ADVNCRAFT@x1=Advanced Crafting @x2,3,LEVEL,-SKILLFLAG "+CRAFTING&!NATURE_LORE" +JAVACLASS -TEXTILING,-MAXCLASSLEVEL +>={1+(20*@x1)},+WIS {10+(4*@x1)} +INT {10+(4*@x1)},0,2,0,0,0
 HELP_=<EXPERTISE>The ability to craft items of higher level.
 HELP_ADVNCRAFT1=<EXPERTISE>The ability to craft items of higher level. Items crafted "Improved" are also a tiny bit better.
 HELP_ADVNCRAFT2=<EXPERTISE>The ability to craft items of higher level. Items crafted "Enhanced" are also a little better.
@@ -533,14 +533,14 @@ HELP_=<EXPERTISE>The ability to craft items more quickly and efficiently.
 QUICKBUILD@x1=Quick Building @x2,10,TIME,-SKILLFLAG +BUILDING,,+WIS {10+@x1},0,1,0,0,0
 HELP_=<EXPERTISE>The ability to build more quickly and efficiently.
 
-LTHLCRAFT@x1=Lethal Crafting @x2,3,X4,-SKILL +Carpentry +Fletching +ScrimShaw +Weaponsmithing +MasterWeaponsmithing +LegendaryWeaponsmithing,,+CON {10+(4*@x1)},0,2,0,0,0
+LTHLCRAFT@x1=Lethal Crafting @x2,3,X4,-SKILL +Carpentry +Fletching +ScrimShaw +Weaponsmithing +MasterWeaponsmithing +LegendaryWeaponsmithing +StaffMaking,,+CON {10+(4*@x1)},0,2,0,0,0
 HELP_=<EXPERTISE>The ability to craft weapons that are more deadly than usual.
 HELP_LTHLCRAFT1=<EXPERTISE>The ability to craft weapons that are more deadly than usual. Items crafted "Damaging" are slightly more damaging, and worth slightly more.
 HELP_LTHLCRAFT2=<EXPERTISE>The ability to craft weapons that are more deadly than usual. Items crafted "Brutal" are a little more damaging, and worth more.
 HELP_LTHLCRAFT3=<EXPERTISE>The ability to craft weapons that are more deadly than usual. Items crafted "Lethal" are more damaging, and worth much more.
 DATA_=Damaging,Brutal,Lethal
 
-CNTRCRAFT@x1=Counterbalance Crafting @x2,3,X5,-SKILL +Carpentry +Fletching +ScrimShaw +Weaponsmithing +MasterWeaponsmithing +LegendaryWeaponsmithing,,+INT {10+(4*@x1)},0,2,0,0,0
+CNTRCRAFT@x1=Counterbalance Crafting @x2,3,X5,-SKILL +Carpentry +Fletching +ScrimShaw +Weaponsmithing +MasterWeaponsmithing +LegendaryWeaponsmithing +StaffMaking,,+INT {10+(4*@x1)},0,2,0,0,0
 HELP_=<EXPERTISE>The ability to craft weapons that are more balanced for attacking than usual.
 HELP_CNTRCRAFT1=<EXPERTISE>The ability to craft weapons that are more balanced for attacking than usual. Items crafted "Even" are slightly better for attack, and worth a little more.
 HELP_CNTRCRAFT2=<EXPERTISE>The ability to craft weapons that are more balanced for attacking than usual. Items crafted "Balanced" are better for attack, and worth more.

@@ -160,17 +160,31 @@ public class CraftingSkill extends GatheringSkill
 		return newWeight;
 	}
 
-	protected String determineFinalName(final String thisStr, final int backupMaterial, final MaterialLibrary.DeadResourceRecord res1, final MaterialLibrary.DeadResourceRecord res2)
+	protected String determineFinalResourceName(final int backupMaterial, final MaterialLibrary.DeadResourceRecord res1, final MaterialLibrary.DeadResourceRecord res2)
 	{
 		if((res1 != null)&&(res1.subType.length()>0))
-			return replacePercent(thisStr, res1.subType.toLowerCase()).toLowerCase();
+			return res1.subType.toLowerCase();
 		if((res2 != null)&&(res2.subType.length()>0))
-			return replacePercent(thisStr, res2.subType.toLowerCase()).toLowerCase();
+			return res2.subType.toLowerCase();
 		if((res1!=null)&&(res1.resCode>=0))
-			return replacePercent(thisStr, RawMaterial.CODES.NAME(res1.resCode)).toLowerCase();
+			return RawMaterial.CODES.NAME(res1.resCode).toLowerCase();
 		if((res2!=null)&&(res2.resCode>=0))
-			return replacePercent(thisStr, RawMaterial.CODES.NAME(res2.resCode)).toLowerCase();
-		return replacePercent(thisStr, RawMaterial.CODES.NAME(backupMaterial)).toLowerCase();
+			return RawMaterial.CODES.NAME(res2.resCode).toLowerCase();
+		return RawMaterial.CODES.NAME(backupMaterial).toLowerCase();
+	}
+
+	protected String determineFinalName(final String thisStr, final int backupMaterial, final MaterialLibrary.DeadResourceRecord res1, final MaterialLibrary.DeadResourceRecord res2)
+	{
+		final String resourceName = this.determineFinalResourceName(backupMaterial, res1, res2);
+		return replacePercent(thisStr, resourceName).toLowerCase();
+	}
+
+	protected String determineDescription(final String name, final int backupMaterial, final MaterialLibrary.DeadResourceRecord res1, final MaterialLibrary.DeadResourceRecord res2)
+	{
+		final String resourceName = this.determineFinalResourceName(backupMaterial, res1, res2);
+		if(name.toLowerCase().indexOf(resourceName) >= 0)
+			return name+".  ";
+		return L("@x1 made from @x2. ", name, resourceName);
 	}
 
 	@Override
@@ -459,12 +473,10 @@ public class CraftingSkill extends GatheringSkill
 
 	protected void setWearLocation(final Item I, final String wearLocation, final int hardnessMultiplier)
 	{
-		short[] layerAtt = null;
-		short[] layers = null;
+		final short[] layerAtt = new short[1];
+		final short[] layers = new short[1];
 		if(I instanceof Armor)
 		{
-			layerAtt = new short[1];
-			layers = new short[1];
 			final long[] wornLoc = new long[1];
 			final boolean[] logicalAnd = new boolean[1];
 			final double[] hardBonus=new double[]{hardnessMultiplier};
@@ -477,6 +489,15 @@ public class CraftingSkill extends GatheringSkill
 			}
 			if(I.basePhyStats().armor()>0)
 				I.basePhyStats().setArmor(I.basePhyStats().armor()+(int)Math.round(hardBonus[0]));
+			I.setRawLogicalAnd(logicalAnd[0]);
+			I.setRawProperLocationBitmap(wornLoc[0]);
+		}
+		else
+		{
+			final long[] wornLoc = new long[1];
+			final boolean[] logicalAnd = new boolean[1];
+			final double[] hardBonus=new double[]{1};
+			CMLib.ableParms().parseWearLocation(layerAtt,layers,wornLoc,logicalAnd,hardBonus,wearLocation);
 			I.setRawLogicalAnd(logicalAnd[0]);
 			I.setRawProperLocationBitmap(wornLoc[0]);
 		}
@@ -497,6 +518,7 @@ public class CraftingSkill extends GatheringSkill
 
 	protected static final int FOUND_CODE=0;
 	protected static final int FOUND_AMT=1;
+	protected static final int FOUND_SUB=2;
 
 	public List<List<String>> fetchRecipes()
 	{
@@ -517,7 +539,7 @@ public class CraftingSkill extends GatheringSkill
 											 final int autoGeneration,
 											 final PairVector<EnhancedExpertise,Integer> eduMods)
 	{
-		final int[][] data=new int[2][2];
+		final int[][] data=new int[2][3];
 		if((req1Desc!=null)&&(req1Desc.length()==0))
 			req1Desc=null;
 		if((req2Desc!=null)&&(req2Desc.length()==0))
@@ -530,6 +552,8 @@ public class CraftingSkill extends GatheringSkill
 			data[1][FOUND_AMT]=req2Required;
 			data[0][FOUND_CODE]=autoGeneration;
 			data[1][FOUND_CODE]=autoGeneration;
+			data[0][FOUND_SUB]="".hashCode();
+			data[1][FOUND_SUB]="".hashCode();
 			return data;
 		}
 
@@ -543,9 +567,13 @@ public class CraftingSkill extends GatheringSkill
 					firstWood=CMLib.materials().findMostOfMaterial(mob.location(),element);
 				else
 					firstWood=CMLib.materials().findFirstResource(mob.location(),element);
-
 				if(firstWood!=null)
-					break;
+				{
+					if(firstWood.getSubType().equals(RawMaterial.ResourceSubType.SEED.name()))
+						firstWood=null;
+					else
+						break;
+				}
 			}
 		}
 		else
@@ -556,6 +584,7 @@ public class CraftingSkill extends GatheringSkill
 		{
 			data[0][FOUND_AMT]=CMLib.materials().findNumberOfResource(mob.location(),firstWood);
 			data[0][FOUND_CODE]=firstWood.material();
+			data[0][FOUND_SUB]=firstWood.getSubType().hashCode();
 		}
 
 		if(req2!=null)
@@ -567,7 +596,12 @@ public class CraftingSkill extends GatheringSkill
 				else
 					firstOther=CMLib.materials().findFirstResource(mob.location(),element);
 				if(firstOther!=null)
-					break;
+				{
+					if(firstOther.getSubType().equals(RawMaterial.ResourceSubType.SEED.name()))
+						firstOther=null;
+					else
+						break;
+				}
 			}
 		}
 		else
@@ -578,6 +612,7 @@ public class CraftingSkill extends GatheringSkill
 		{
 			data[1][FOUND_AMT]=CMLib.materials().findNumberOfResource(mob.location(),firstOther);
 			data[1][FOUND_CODE]=firstOther.material();
+			data[1][FOUND_SUB]=firstOther.getSubType().hashCode();
 		}
 		if(req1Required>0)
 		{
@@ -598,6 +633,17 @@ public class CraftingSkill extends GatheringSkill
 						}
 					}
 					commonTell(mob,L("There is no @x1 here to make anything from!  It might need to be put down first.",req1Desc.toLowerCase()));
+				}
+				else
+				if((req1!=null)&&(req1.length>0))
+				{
+					final int rscCode=req1[0];
+					final String rscName=CMLib.materials().makeResourceSimpleName(rscCode, "");
+					if(rscName!=null)
+					{
+						commonTell(mob,L("There is no @x1 here to make anything from!  It might need to be put down first.",rscName));
+						return null;
+					}
 				}
 				return null;
 			}
@@ -1192,7 +1238,7 @@ public class CraftingSkill extends GatheringSkill
 				return false;
 			}
 		}
-		final Vector<Item> allStuff=getAllMendable(mob,scanning,null);
+		final List<Item> allStuff=getAllMendable(mob,scanning,null);
 		if(allStuff.size()==0)
 		{
 			if(mob==scanning)
@@ -1208,7 +1254,7 @@ public class CraftingSkill extends GatheringSkill
 			buf.append(L("The following items on @x1 could use some @x2:\n\r",scanning.name(),name()));
 		for(int i=0;i<allStuff.size();i++)
 		{
-			final Item I=allStuff.elementAt(i);
+			final Item I=allStuff.get(i);
 			buf.append(CMStrings.padRight(I.usesRemaining()+"%",5)+I.name());
 			if(!I.amWearingAt(Wearable.IN_INVENTORY))
 				buf.append(" ("+Wearable.CODES.NAME(I.rawWornCode())+")");

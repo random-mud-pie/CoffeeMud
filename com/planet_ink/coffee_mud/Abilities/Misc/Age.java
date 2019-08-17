@@ -16,6 +16,7 @@ import com.planet_ink.coffee_mud.Exits.interfaces.*;
 import com.planet_ink.coffee_mud.Items.interfaces.*;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
+import com.planet_ink.coffee_mud.MOBS.interfaces.MOB.Attrib;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
 
 import java.io.IOException;
@@ -712,9 +713,10 @@ public class Age extends StdAbility
 				if((liege != null) && (liege.session() != null))
 					newMan.playerStats().setLastIP(liege.session().getAddress());
 				Log.sysOut("Age","Created user: "+newMan.Name());
-				CMLib.login().notifyFriends(newMan,L("^X@x1 has just been created.^.^?",newMan.Name()));
+				if(!newMan.isAttributeSet(Attrib.PRIVACY))
+					CMLib.login().notifyFriends(newMan,L("^X@x1 has just been created.^.^?",newMan.Name()));
 
-				final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.NEWPLAYERS);
+				final List<String> channels=CMLib.channels().getFlaggedChannelNames(ChannelsLibrary.ChannelFlag.NEWPLAYERS, newMan);
 				for(int i=0;i<channels.size();i++)
 					CMLib.commands().postChannel(channels.get(i),newMan.clans(),L("@x1 has just been created.",newMan.Name()),true);
 
@@ -853,6 +855,76 @@ public class Age extends StdAbility
 		}
 	}
 
+	protected volatile long nextAgeCheckTimeMs = System.currentTimeMillis();
+
+	protected void doPeriodicAgeCheck()
+	{
+		long lastCheckedAt;
+		synchronized(this)
+		{
+			lastCheckedAt = this.nextAgeCheckTimeMs;
+		}
+		if(System.currentTimeMillis() < lastCheckedAt)
+			return;
+		synchronized(this)
+		{
+			this.nextAgeCheckTimeMs = System.currentTimeMillis() + 5000;
+		}
+		this.doAgeChangeCheck();
+	}
+
+	@Override
+	public void setStat(final String code, final String val)
+	{
+		if(code != null)
+		{
+			if (code.equalsIgnoreCase("BIRTHDATE"))
+				this.setMiscText(""+CMath.s_long(val));
+			else
+			if (code.equalsIgnoreCase("AGEYEARS"))
+			{
+				final int numYears = CMath.s_int(val);
+				if(numYears > 0)
+				{
+					final TimeClock C=CMLib.time().localClock(affected);
+					final int months = C.getMonthsInYear() * numYears;
+					final int days = months * C.getDaysInMonth();
+					final long hours = days * C.getHoursInDay();
+					setMiscText(""+(System.currentTimeMillis()-(hours * CMProps.getMillisPerMudHour())));
+				}
+			}
+			else
+				super.setStat(code, val);
+		}
+	}
+
+	@Override
+	public String getStat(final String code)
+	{
+		if(code != null)
+		{
+			if (code.equalsIgnoreCase("BIRTHDATE"))
+				return text();
+			else
+			if (code.equalsIgnoreCase("AGEYEARS"))
+			{
+				final long start=CMath.s_long(text());
+				if(start<Short.MAX_VALUE)
+					return "";
+				final TimeClock C=CMLib.time().localClock(affected);
+				final long days=((System.currentTimeMillis()-start)/CMProps.getTickMillis())/CMProps.getIntVar(CMProps.Int.TICKSPERMUDDAY); // down to days;
+				final long months=days/C.getDaysInMonth();
+				final long years=months/C.getMonthsInYear();
+				if(years > 0)
+					return ""+years;
+				return "0";
+			}
+			else
+				return super.getStat(code);
+		}
+		return "";
+	}
+
 	@Override
 	public void executeMsg(final Environmental myHost, final CMMsg msg)
 	{
@@ -965,7 +1037,9 @@ public class Age extends StdAbility
 					if((mob==null)&&(((Item)affected).owner() instanceof Room))
 						mob=((Room)((Item)affected).owner()).fetchInhabitant(0);
 
-					if((soil)&&(affected.fetchEffect("Soiled")==null)&&(mob!=null)&&(!affected.name().toLowerCase().endsWith(" egg")))
+					if((soil)
+					&&(affected.fetchEffect("Soiled")==null)
+					&&(mob!=null)&&(!affected.name().toLowerCase().endsWith(" egg")))
 					{
 						final Ability A=CMClass.getAbility("Soiled");
 						if(A!=null)
@@ -973,15 +1047,60 @@ public class Age extends StdAbility
 					}
 				}
 			}
-			doAgeChangeCheck();
+			msg.addTrailerRunnable(myAgeCheckRunner);
 		}
+	}
+
+	protected Runnable myAgeCheckRunner = new Runnable()
+	{
+		@Override
+		public void run()
+		{
+			doPeriodicAgeCheck();
+		}
+	};
+
+	@Override
+	public CMObject copyOf()
+	{
+		final Age A=(Age)super.copyOf();
+		if(A!=null)
+		{
+			A.myAgeCheckRunner = new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					A.doPeriodicAgeCheck();
+				}
+			};
+		}
+		return A;
+	}
+
+	@Override
+	public CMObject newInstance()
+	{
+		final Age A=(Age)super.newInstance();
+		if(A!=null)
+		{
+			A.myAgeCheckRunner = new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					A.doPeriodicAgeCheck();
+				}
+			};
+		}
+		return A;
 	}
 
 	@Override
 	public void affectPhyStats(final Physical affected, final PhyStats affectableStats)
 	{
 		super.affectPhyStats(affected,affectableStats);
-		doAgeChangeCheck();
+		this.doPeriodicAgeCheck();
 	}
 
 	@Override

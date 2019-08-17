@@ -15,6 +15,7 @@ import com.planet_ink.coffee_mud.Libraries.interfaces.DatabaseEngine;
 import com.planet_ink.coffee_mud.Libraries.interfaces.DatabaseEngine.PlayerData;
 import com.planet_ink.coffee_mud.Locales.interfaces.*;
 import com.planet_ink.coffee_mud.MOBS.interfaces.*;
+import com.planet_ink.coffee_mud.MOBS.interfaces.PostOffice.MailPiece;
 import com.planet_ink.coffee_mud.Races.interfaces.*;
 
 import java.util.*;
@@ -330,11 +331,13 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 					continue;
 				if(CMLib.english().containsString(I.Name(),likeThis))
 					return I;
+				I.destroy();
 			}
 		}
 		return null;
 	}
 
+	@Override
 	public MailPiece findExactBoxData(final String boxName, final Item likeThis)
 	{
 		final List<PlayerData> V=getBoxRowPDData(boxName);
@@ -545,30 +548,35 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 		if((tickID==Tickable.TICKID_MOB)&&(getStartRoom()!=null))
 		{
 			boolean proceed=false;
-			// handle interest by watching the days go by...
 			// each chain is handled by one branch,
 			// since pending mail all looks the same.
-			Long L=postalTimes.get(postalChain()+"/"+postalBranch());
-			if((L==null)||(L.longValue()<System.currentTimeMillis()))
+			synchronized(postalTimes)
 			{
-				proceed=(L!=null);
-				L=Long.valueOf(System.currentTimeMillis()+postalWaitTime());
-				postalTimes.remove(postalChain()+"/"+postalBranch());
-				postalTimes.put(postalChain()+"/"+postalBranch(),L);
+				Long L=postalTimes.get(postalChain()+"/"+postalBranch());
+				if((L==null)||(L.longValue()<System.currentTimeMillis()))
+				{
+					proceed=(L!=null);
+					L=Long.valueOf(System.currentTimeMillis()+postalWaitTime());
+					postalTimes.remove(postalChain()+"/"+postalBranch());
+					postalTimes.put(postalChain()+"/"+postalBranch(),L);
+				}
 			}
 			if(proceed)
 			{
-				List<PlayerData> V=getBoxRowPDData(postalChain());
-				if(V==null)
-					V=new ArrayList<PlayerData>(0);
+				List<PlayerData> postalDataV=getBoxRowPDData(postalChain());
+				if(postalDataV==null)
+					postalDataV=new ArrayList<PlayerData>(0);
 				// first parse all the pending mail,
 				// and remove it from the sorter
-				final List<MailPiece> parsed=new ArrayList<MailPiece>(V.size());
-				for(int v=0;v<V.size();v++)
+				final List<MailPiece> parsed=new ArrayList<MailPiece>(postalDataV.size());
+				for(int v=0;v<postalDataV.size();v++)
 				{
-					final DatabaseEngine.PlayerData PD=V.get(v);
-					parsed.add(parsePostalItemData(PD.xml()));
-					CMLib.database().DBDeletePlayerData(PD.who(),PD.section(),PD.key());
+					final DatabaseEngine.PlayerData PD=postalDataV.get(v);
+					if(PD.key().startsWith(postalBranch()+";"))
+					{
+						parsed.add(parsePostalItemData(PD.xml()));
+						CMLib.database().DBDeletePlayerData(PD.who(),PD.section(),PD.key());
+					}
 				}
 				PostOffice P=null;
 				for(int v=0;v<parsed.size();v++)
@@ -596,15 +604,15 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 							P.addToBox(fromWhom,I,V2.to,"POSTMASTER",System.currentTimeMillis(),0.0);
 					}
 				}
-				V=CMLib.database().DBReadPlayerSectionData(postalChain());
+				postalDataV=CMLib.database().DBReadPlayerSectionData(postalChain());
 				TimeClock TC=null;
 				if(getStartRoom()!=null)
 					TC=getStartRoom().getArea().getTimeObj();
 				if((TC!=null)&&(maxMudMonthsHeld()>0))
 				{
-					for(int v=0;v<V.size();v++)
+					for(int v=0;v<postalDataV.size();v++)
 					{
-						final DatabaseEngine.PlayerData V2=V.get(v);
+						final DatabaseEngine.PlayerData V2=postalDataV.get(v);
 						if(V2.key().startsWith(postalBranch()+";"))
 						{
 							final MailPiece data=parsePostalItemData(V2.xml());
@@ -771,6 +779,12 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 							CMLib.commands().postSay(this,mob,L("I can't seem to deliver @x1.",msg.tool().name()),true,false);
 					}
 				}
+				if ((CMSecurity.isAllowed(msg.source(), location(), CMSecurity.SecFlag.ORDER)
+				|| (CMLib.law().doesHavePriviledgesHere(msg.source(), getStartRoom()))
+				|| (CMSecurity.isAllowed(msg.source(), location(), CMSecurity.SecFlag.CMDMOBS) && (isMonster()))
+				|| (CMSecurity.isAllowed(msg.source(), location(), CMSecurity.SecFlag.CMDROOMS) && (isMonster()))))
+					return;
+				super.executeMsg(myHost, msg);
 				return;
 			case CMMsg.TYP_WITHDRAW:
 				if(CMLib.flags().isAliveAwakeMobileUnbound(mob,true))
@@ -816,6 +830,7 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 							location().send(mob,msg2);
 					}
 				}
+				super.executeMsg(myHost, msg);
 				return;
 			case CMMsg.TYP_VALUE:
 			case CMMsg.TYP_SELL:
@@ -944,24 +959,24 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 				super.executeMsg(myHost,msg);
 				if(CMLib.flags().isAliveAwakeMobileUnbound(mob,true))
 				{
-					List<PlayerData> V=null;
+					List<PlayerData> allPostalData=null;
 					final String theName=getSenderName(msg.source(),Clan.Function.DEPOSIT_LIST,false);
 					if(isSold(ShopKeeper.DEAL_CLANPOSTMAN))
-						V=getAllLocalBoxPD(theName);
+						allPostalData=getAllLocalBoxPD(theName);
 					else
 					{
-						V=getAllLocalBoxPD(theName);
+						allPostalData=getAllLocalBoxPD(theName);
 						if(mob.isMarriedToLiege())
 						{
 							final List<PlayerData> PDV=getAllLocalBoxPD(mob.getLiegeID());
 							if((PDV!=null)&&(PDV.size()>0))
-								V.addAll(PDV);
+								allPostalData.addAll(PDV);
 						}
 					}
 
 					final TimeClock C=CMLib.time().localClock(getStartRoom());
 					boolean codCharge=false;
-					if(V.size()==0)
+					if(allPostalData.size()==0)
 						mob.tell(L("\n\rYour postal box is presently empty."));
 					else
 					{
@@ -969,9 +984,10 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 						str.append(L("\n\rItems in your postal box here:\n\r"));
 						str.append(L("^x[COD     ][From           ][Sent           ][Item                        ]^.^N"));
 						mob.tell(str.toString());
-						for(int i=0;i<V.size();i++)
+						for(int i=0;i<allPostalData.size();i++)
 						{
-							final DatabaseEngine.PlayerData PD=V.get(i);
+							final DatabaseEngine.PlayerData PD=allPostalData.get(i);
+							// already filtered by getAllLocalBoxPD
 							final MailPiece pieces=parsePostalItemData(PD.xml());
 							final Item I=makeItem(pieces);
 							if(I==null)
@@ -1055,7 +1071,7 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 						return false;
 					}
 				}
-				return true;
+				return super.okMessage(myHost, msg);
 			case CMMsg.TYP_WITHDRAW:
 				{
 					if(!CMLib.coffeeShops().ignoreIfNecessary(msg.source(),finalIgnoreMask(),this))
@@ -1087,7 +1103,7 @@ public class StdPostman extends StdShopKeeper implements PostOffice
 						return false;
 					}
 				}
-				return true;
+				return super.okMessage(myHost,msg);
 			case CMMsg.TYP_VALUE:
 			case CMMsg.TYP_SELL:
 			case CMMsg.TYP_VIEW:

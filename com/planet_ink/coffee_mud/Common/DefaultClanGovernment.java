@@ -739,16 +739,21 @@ public class DefaultClanGovernment implements ClanGovernment
 		case VOTEFUNCS:
 		{
 			final StringBuilder str = new StringBuilder("");
+			final Set<Function> found=new HashSet<Function>();
 			for (final ClanPosition pos : positions)
 			{
 				for (int a = 0; a < Function.values().length; a++)
-					if (pos.getFunctionChart()[a] == Authority.MUST_VOTE_ON)
-					{
-						if (str.length() > 0)
-							str.append(",");
-						str.append(Function.values()[a]);
-					}
-				break;
+				{
+					if((pos.getFunctionChart()[a] == Authority.MUST_VOTE_ON)
+					&&(!found.contains(Function.values()[a])))
+						found.add(Function.values()[a]);
+				}
+			}
+			for(final Function func : found)
+			{
+				if (str.length() > 0)
+					str.append(",");
+				str.append(func.toString());
 			}
 			return str.toString();
 		}
@@ -910,14 +915,16 @@ public class DefaultClanGovernment implements ClanGovernment
 			{
 				for (int a = 0; a < Function.values().length; a++)
 				{
-					if (pos.getFunctionChart()[a] == Authority.MUST_VOTE_ON)
+					final Function func = Function.values()[a];
+					final boolean voteOn = funcs.contains(func.toString());
+					if(voteOn)
+					{
+						if(pos.getFunctionChart()[a] == Authority.CAN_NOT_DO)
+							pos.getFunctionChart()[a] = Authority.MUST_VOTE_ON;
+					}
+					else
+					if(pos.getFunctionChart()[a] == Authority.MUST_VOTE_ON)
 						pos.getFunctionChart()[a] = Authority.CAN_NOT_DO;
-				}
-				for (final String funcName : funcs)
-				{
-					final Clan.Function func = (Clan.Function) CMath.s_valueOf(Function.values(), funcName);
-					if (func != null)
-						pos.getFunctionChart()[func.ordinal()] = Authority.MUST_VOTE_ON;
 				}
 			}
 			break;
@@ -1139,7 +1146,7 @@ public class DefaultClanGovernment implements ClanGovernment
 			for(int p=0;p<posses.length;p++)
 			{
 				final ClanPosition pos = sortedPositions.get(p);
-				final String name=CMStrings.capitalizeAndLower(pos.getName().replace('_',' '));
+				final String name=CMStrings.capitalizeAllFirstLettersAndLower(pos.getName().replace('_',' '));
 				str.append(CMStrings.padRight(name,posses[p]-1));
 				if(p<posses.length-1)
 					str.append("!");
@@ -1219,7 +1226,7 @@ public class DefaultClanGovernment implements ClanGovernment
 									{
 										final ClanPosition P=findPositionRole(posI);
 										if(P!=null)
-											roleList.add(CMStrings.capitalizeAndLower(P.getName()));
+											roleList.add(CMStrings.capitalizeAllFirstLettersAndLower(P.getName()));
 									}
 									roleNames=CMLib.english().toEnglishStringList(roleList);
 								}
@@ -1249,7 +1256,7 @@ public class DefaultClanGovernment implements ClanGovernment
 									{
 										final ClanPosition P=findPositionRole(posI);
 										if(P!=null)
-											roleList.add(CMStrings.capitalizeAndLower(P.getName()));
+											roleList.add(CMStrings.capitalizeAllFirstLettersAndLower(P.getName()));
 									}
 									roleNames=CMLib.english().toEnglishStringList(roleList);
 								}

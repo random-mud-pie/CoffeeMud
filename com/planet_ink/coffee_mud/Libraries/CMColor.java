@@ -41,8 +41,11 @@ public class CMColor extends StdLibrary implements ColorLibrary
 		return "CMColor";
 	}
 
-	public String[] clookup=null;
-	public String[] htlookup=null;
+	protected String[]		clookup		= null;
+	protected String[]		htlookup	= null;
+	protected Color256[]	color256s	= null;
+
+	protected final Map<Short, Color> color256to16map =  new HashMap<Short, Color>();
 
 	private final static Map<Integer,ColorState> cache=new SHashtable<Integer,ColorState>();
 
@@ -86,6 +89,117 @@ public class CMColor extends StdLibrary implements ColorLibrary
 			return (backgroundCode * 65536) + foregroundCode;
 		}
 
+	}
+
+	/**
+	 * Special mapping object for 256 color ansi system.
+	 *
+	 * @author BZ
+	 */
+	private static class Color256Impl implements Color256
+	{
+		private final short number;
+		private final String name1;
+		private final String name2;
+		private Color non256color;
+		private final String htmlCode;
+		private final short expertiseNum;
+		private final short cm6Code;
+		private final String cmChars;
+
+		public Color256Impl(final short number,  final String name1, final String name2, final Color non256color,
+							final String htmlCode, final short expertiseNum, final short cm6Code, final String cmChars)
+		{
+			this.number=number;
+			this.name1=name1;
+			this.name2=name2;
+			this.non256color=non256color;
+			this.htmlCode=htmlCode;
+			this.expertiseNum=expertiseNum;
+			this.cm6Code=cm6Code;
+			this.cmChars=cmChars;
+		}
+
+		/**
+		 * @param non256color the non256color to set
+		 */
+		@Override
+		public void setNon256color(final Color non256color)
+		{
+			this.non256color = non256color;
+		}
+
+		/**
+		 * @return the number
+		 */
+		@Override
+		public short getNumber()
+		{
+			return number;
+		}
+
+		/**
+		 * @return the name1
+		 */
+		@Override
+		public String getName1()
+		{
+			return name1;
+		}
+
+		/**
+		 * @return the name2
+		 */
+		@Override
+		public String getName2()
+		{
+			return name2;
+		}
+
+		/**
+		 * @return the non256color
+		 */
+		@Override
+		public Color getNon256color()
+		{
+			return non256color;
+		}
+
+		/**
+		 * @return the htmlCode
+		 */
+		@Override
+		public String getHtmlCode()
+		{
+			return htmlCode;
+		}
+
+		/**
+		 * @return the expertiseNum
+		 */
+		@Override
+		public short getExpertiseNum()
+		{
+			return expertiseNum;
+		}
+
+		/**
+		 * @return the cm6Code
+		 */
+		@Override
+		public short getCm6Code()
+		{
+			return cm6Code;
+		}
+
+		/**
+		 * @return the cmChars
+		 */
+		@Override
+		public String getCmChars()
+		{
+			return cmChars;
+		}
 	}
 
 	private static final ColorState COLORSTATE_NORMAL=new ColorStateImpl('N','.');
@@ -143,9 +257,46 @@ public class CMColor extends StdLibrary implements ColorLibrary
 	}
 
 	@Override
+	public String[] fixPlayerColorDefs(final String colorDefs)
+	{
+		final String[] clookup=CMLib.color().standardColorLookups().clone();
+		final List<String> changesList = CMParms.parseAny(colorDefs, '#', true);
+		for(final String change : changesList)
+		{
+			int subChar;
+			String subColor;
+			if(change.startsWith("(") && (change.indexOf(')')>0))
+			{
+				final int x=change.indexOf(')');
+				subChar=CMath.s_int(change.substring(1,x));
+				subColor = change.substring(x+1);
+			}
+			else
+			{
+				subChar=change.charAt(0);
+				subColor=change.substring(1);
+			}
+			if((subColor.length()>4)
+			&&(subColor.charAt(2)=='|')
+			&&(subColor.charAt(3)=='^'))
+				subColor=subColor.substring(3)+"^~"+subColor.substring(1, 2);
+			clookup[subChar]=subColor;
+		}
+		for(int i=0;i<clookup.length;i++)
+		{
+			final String s=clookup[i];
+			if((s!=null)
+			&&(s.startsWith("^"))
+			&&(s.length()==2))
+				clookup[i]=clookup[s.charAt(1)];
+		}
+		return clookup;
+	}
+
+	@Override
 	public String translateCMCodeToANSI(final String code)
 	{
-		if(code.length()==0)
+		if((code==null)||(code.length()==0))
 			return code;
 		if(!code.startsWith("^"))
 			return code;
@@ -386,6 +537,8 @@ public class CMColor extends StdLibrary implements ColorLibrary
 	public void clearLookups()
 	{
 		clookup = null;
+		Resources.removeResource("SYSTEM_COLOR_INFO: "+true);
+		Resources.removeResource("SYSTEM_COLOR_INFO: "+false);
 	}
 
 	@Override
@@ -503,5 +656,234 @@ public class CMColor extends StdLibrary implements ColorLibrary
 			}
 		}
 		return clookup;
+	}
+
+	@Override
+	public String getColorInfo(final boolean doAll256)
+	{
+		StringBuffer buf = (StringBuffer)Resources.getResource("SYSTEM_COLOR_INFO: "+doAll256);
+		if(buf == null)
+		{
+			buf = new StringBuffer("");
+			int longestName = 0;
+			int secondLongestName = 0;
+			for(final Color256 C : color256s)
+			{
+				if(C!=null)
+				{
+					if(C.getName1().length()>longestName)
+						longestName=C.getName1().length();
+					if(C.getName2().length()>secondLongestName)
+						secondLongestName=C.getName2().length();
+				}
+			}
+			final int colSize = (longestName + secondLongestName + 2 + 6);
+			final int max_cols = 78 / colSize;
+			int col=1;
+			for(final Color256 C : color256s)
+			{
+				if((C==null)
+				||((!doAll256) && (C.getCm6Code() >=0))
+				||((C.getCm6Code()<0)&&(C.getNon256color()==Color.BLACK)))
+					continue;
+				buf.append("^N").append(CMStrings.padRight("^"+C.getCmChars(), 6))
+					.append(C.getCmChars())
+					.append(CMStrings.padRight(C.getName1(), longestName))
+					.append("^N: ").append(C.getCmChars())
+					.append(CMStrings.padRight(C.getName2(), secondLongestName))
+					.append("^N");
+				if((++col) >= max_cols)
+				{
+					col=1;
+					buf.append("\n\r");
+				}
+			}
+			Resources.submitResource("SYSTEM_COLOR_INFO: "+doAll256, buf);
+		}
+		return buf.toString();
+	}
+
+	protected void generateRecipes()
+	{
+		final StringBuilder str=new StringBuilder("");
+		final Set<String> namesUsed = new HashSet<String>();
+		final List<Color256> allColors = new XVector<Color256>(color256s);
+		Collections.sort(allColors, new Comparator<Color256>()
+		{
+			@Override
+			public int compare(final Color256 o1, final Color256 o2)
+			{
+				int level1 = 1;
+				if(o1.getExpertiseNum() > 0)
+				{
+					final ExpertiseLibrary.ExpertiseDefinition def=CMLib.expertises().getDefinition("TUNING"+o1.getExpertiseNum());
+					if(def.getMinimumLevel()>0)
+						level1=def.getMinimumLevel();
+				}
+				int level2 = 1;
+				if(o2.getExpertiseNum() > 0)
+				{
+					final ExpertiseLibrary.ExpertiseDefinition def=CMLib.expertises().getDefinition("TUNING"+o2.getExpertiseNum());
+					if(def.getMinimumLevel()>0)
+						level2=def.getMinimumLevel();
+				}
+				if(level1==level2)
+					return 0;
+				if(level1>level2)
+					return 1;
+				return -1;
+			}
+
+		});
+		for(final Color256 c : allColors)
+		{
+			if((c.getName1().indexOf("black")>=0)
+			||(c.getName2().indexOf("black")>=0))
+				continue;
+			int level = 1;
+			if(c.getExpertiseNum() > 0)
+			{
+				final ExpertiseLibrary.ExpertiseDefinition def=CMLib.expertises().getDefinition("TUNING"+c.getExpertiseNum());
+				if(def.getMinimumLevel()>0)
+					level=def.getMinimumLevel();
+			}
+			if(namesUsed.contains(c.getName1()))
+			{
+				System.out.println("Re-used: "+c.getName1());
+				continue;
+			}
+			final String misc = (c.getCmChars().indexOf('#')>0)?"ANSI256=TRUE":"";
+			str.append(c.getName1()).append("\t")
+			   .append(level).append("\t")
+			   .append(9+level).append("\t")
+			   .append(c.getCmChars()).append(c.getName1()).append("^?\t")
+			   .append("").append("\t") // application mask
+			   .append(c.getExpertiseNum()).append("\t")  // expertise
+			   .append(misc).append("\n\r");
+			namesUsed.add(c.getName1());
+			if(namesUsed.contains(c.getName2()))
+				continue;
+			if(!c.getName1().equals(c.getName2()))
+			{
+				str.append(c.getName2()).append("\t")
+				   .append(level+10).append("\t")
+				   .append(10+level).append("\t")
+				   .append(c.getCmChars()).append(c.getName2()).append("^?\t")
+				   .append("").append("\t") // application mask
+				   .append(c.getExpertiseNum()).append("\t")  // expertise
+				   .append(misc).append("\n\r");
+			}
+		}
+		final CMFile F1=new CMFile("///resources/skills/dyeing.txt",null);
+		F1.saveText(str.toString());
+		final CMFile F2=new CMFile("///resources/skills/lacquering.txt",null);
+		F2.saveText(str.toString());
+	}
+
+	@Override
+	public boolean activate()
+	{
+		final List<Color256> list=new ArrayList<Color256>();
+		final CMFile F=new CMFile(Resources.buildResourcePath("skills/colors.txt"),null);
+		if(F.exists())
+		{
+			color256to16map.clear();
+			final List<String> lines=Resources.getFileLineVector(F.text());
+			final Map<Short,Short> color16map=new TreeMap<Short,Short>();
+			final Map<Short,Color256> straightMap=new TreeMap<Short,Color256>();
+			for(final String line : lines)
+			{
+				if(line.trim().startsWith("#"))
+					continue;
+				final String[] bits = line.split("\t");
+				if(bits.length>=8)
+				{
+					Color baseColor = null;
+					short cm6code = -1;
+					if(bits[7].length()>0)
+					{
+						if(CMath.isNumber(bits[7].substring(0, 1)))
+						{
+							int num=bits[7].charAt(0)-'0';
+							if((num>=0)&&(num<=5))
+							{
+								int buildNum=(num*36);
+								num=bits[7].charAt(1)-'0';
+								if((num>=0)&&(num<=5))
+								{
+									buildNum+=(num*6);
+									num=bits[7].charAt(2)-'0';
+									if((num>=0)&&(num<=5))
+										cm6code=(short)((buildNum + num) + 16);
+								}
+							}
+						}
+						else
+							baseColor = (ColorLibrary.Color)CMath.s_valueOf(ColorLibrary.Color.class, bits[7].toUpperCase().trim());
+					}
+					String cmChars;
+					if(cm6code < 0)
+					{
+						if(baseColor != null)
+							cmChars = "^"+baseColor.getCodeChar();
+						else
+						{
+							Log.errOut("Error in skills/colors.txt: "+line);
+							continue;
+						}
+					}
+					else
+						cmChars = "^#"+bits[7];
+					final Color256Impl newColor = new Color256Impl(
+						CMath.s_short(bits[0]),  bits[1], bits[2], baseColor,
+						bits[5], CMath.s_short(bits[6]), cm6code, cmChars
+					);
+					if(bits[4].length()>0)
+						color16map.put(Short.valueOf(newColor.number), Short.valueOf(CMath.s_short(bits[4])));
+					list.add(newColor);
+					straightMap.put(Short.valueOf(newColor.number), newColor);
+				}
+			}
+			for(final Short s : color16map.keySet())
+			{
+				final Short color256to16 = color16map.get(s);
+				final Color256 color256 = straightMap.get(s);
+				if(color256 != null)
+				{
+					final Color256 color16 = straightMap.get(color256to16);
+					if((color16 != null)
+					&&(color16.getNon256color() != null))
+					{
+						color256.setNon256color(color16.getNon256color());
+						color256to16map.put(Short.valueOf(color256.getCm6Code()), color16.getNon256color());
+					}
+					else
+						Log.errOut("Unable to map color.dat number "+color256.getNumber()+" to "+color256to16);
+				}
+			}
+			Collections.sort(list, new Comparator<Color256>()
+			{
+				@Override
+				public int compare(final Color256 o1, final Color256 o2)
+				{
+					return Integer.valueOf(o1.getNumber()).compareTo(Integer.valueOf(o2.getNumber()));
+				}
+			});
+			color256s=list.toArray(new Color256[0]);
+		}
+		//generateRecipes(); //BZ:DELME
+		return true;
+	}
+
+	@Override
+	public Color getANSI16Equivalent(final short color256Code)
+	{
+		return color256to16map.get(Short.valueOf(color256Code));
+	}
+
+	@Override
+	public Enumeration<Color256> getColors256()
+	{
+		return new IteratorEnumeration<Color256>(Arrays.asList(this.color256s).iterator());
 	}
 }

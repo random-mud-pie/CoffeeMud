@@ -114,6 +114,8 @@ public class Herbology extends CommonSkill
 							herb=found.rawSecretIdentity();
 							found.setSecretIdentity("");
 						}
+						if(herb == null)
+							herb=L("unknown");
 
 						commonTell(mob,L("@x1 appears to be @x2.",found.name(),herb));
 						String name=found.Name();
@@ -124,6 +126,8 @@ public class Herbology extends CommonSkill
 							found.setName(L("some @x1",herb));
 						found.setDisplayText(L("@x1 is here",found.Name()));
 						found.setDescription("");
+						if(found instanceof RawMaterial)
+							((RawMaterial)found).setSubType(herb.toUpperCase().trim());
 						found.text();
 						if((!isLimitedToOne()) && (foundName!=null))
 						{

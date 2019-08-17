@@ -346,6 +346,7 @@ public class Modify extends StdCommand
 						CMLib.map().addArea(A);
 						CMLib.database().DBCreateArea(A);
 						mob.location().setArea(A);
+						CMLib.map().registerWorldObjectLoaded(A, null, A);
 						CMLib.coffeeMaker().addAutoPropsToAreaIfNecessary(A);
 						reid=true;
 						mob.location().showHappens(CMMsg.MSG_OK_ACTION,L("This entire area twitches.\n\r"));
@@ -528,7 +529,7 @@ public class Modify extends StdCommand
 		Log.sysOut("Modify",mob.Name()+" modified account "+theAccount.getAccountName()+".");
 		if(!oldName.equals(theAccount.getAccountName()))
 		{
-			final Vector<MOB> V=new Vector<MOB>();
+			final List<MOB> V=new ArrayList<MOB>();
 			for(final Enumeration<String> es=theAccount.getPlayers();es.hasMoreElements();)
 			{
 				final String playerName=es.nextElement();

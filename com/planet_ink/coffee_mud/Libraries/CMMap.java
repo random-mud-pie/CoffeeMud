@@ -481,9 +481,14 @@ public class CMMap extends StdLibrary implements WorldMap
 	@Override
 	public long getDistanceFrom(final long[] coord1, final long[] coord2)
 	{
-		return Math.round(Math.sqrt(CMath.mul((coord1[0]-coord2[0]),(coord1[0]-coord2[0]))
-									+CMath.mul((coord1[1]-coord2[1]),(coord1[1]-coord2[1]))
-									+CMath.mul((coord1[2]-coord2[2]),(coord1[2]-coord2[2]))));
+		final BigInteger coord_0 = BigInteger.valueOf(coord1[0]).subtract(BigInteger.valueOf(coord2[0]));
+		final BigInteger coord_0m = coord_0.multiply(coord_0);
+		final BigInteger coord_1 = BigInteger.valueOf(coord1[1]).subtract(BigInteger.valueOf(coord2[1]));
+		final BigInteger coord_1m = coord_1.multiply(coord_1);
+		final BigInteger coord_2 = BigInteger.valueOf(coord1[2]).subtract(BigInteger.valueOf(coord2[2]));
+		final BigInteger coord_2m = coord_2.multiply(coord_2);
+		final BigInteger coords_all = coord_0m.add(coord_1m).add(coord_2m);
+		return Math.round(Math.sqrt(coords_all.doubleValue()));
 	}
 
 	@Override
@@ -1701,9 +1706,9 @@ public class CMMap extends StdLibrary implements WorldMap
 		return null;
 	}
 
-	public List<Item> findRoomItems(final Enumeration<Room> rooms, final MOB mob, final String srchStr, final boolean anyItems, final boolean returnFirst, final int timePct)
+	protected List<Item> findRoomItems(final Enumeration<Room> rooms, final MOB mob, final String srchStr, final boolean anyItems, final boolean returnFirst, final int timePct)
 	{
-		final Vector<Item> found=new Vector<Item>();
+		final Vector<Item> found=new Vector<Item>(); // ultimate return value
 		long delay=Math.round(CMath.s_pct(timePct+"%") * 1000);
 		if(delay>1000)
 			delay=1000;
@@ -4195,26 +4200,24 @@ public class CMMap extends StdLibrary implements WorldMap
 	}
 
 	@Override
-	public double getMinDistanceFrom(final SpaceObject fromObj, final long prevDistance, final SpaceObject toObj)
+	public double getMinDistanceFrom(final long[] prevPos, final long[] curPosition, final long[] objPos)
 	{
-		final long curDistance = getDistanceFrom(fromObj.coordinates(), toObj.coordinates());
-		final double baseDistance=fromObj.speed();
-		if(baseDistance == 0)
-			return curDistance;
-		if((prevDistance == 0)||(curDistance==0))
+		final BigDecimal currentDistance=BigDecimal.valueOf(getDistanceFrom(curPosition, objPos));
+		if(Arrays.equals(prevPos, curPosition))
+			return currentDistance.doubleValue();
+		final BigDecimal prevDistance=BigDecimal.valueOf(getDistanceFrom(prevPos, objPos));
+		final BigDecimal baseDistance=BigDecimal.valueOf(getDistanceFrom(prevPos, curPosition));
+		if(baseDistance.compareTo(currentDistance.add(prevDistance))>0)
 			return 0;
-		if(baseDistance == (curDistance + prevDistance))
-			return 0.0;
-		final BigDecimal bdBaseDistance = new BigDecimal(baseDistance);
-		final BigDecimal bdCurDistance = new BigDecimal(curDistance);
-		final BigDecimal bdPrevDistance = new BigDecimal(prevDistance);
-		final BigDecimal s0=bdCurDistance.multiply(bdCurDistance);
-		final BigDecimal s1=bdPrevDistance.multiply(bdPrevDistance);
-		final BigDecimal s2=bdBaseDistance.multiply(bdBaseDistance);
-		BigDecimal s3=bdPrevDistance.multiply(bdBaseDistance).multiply(TWO);
-		if(s3.doubleValue()==0.0)
-			s3=ONE;
-		final double distAngle = Math.acos(s0.add(s2).subtract(s1).divide(s3,MathContext.DECIMAL64.getPrecision(),RoundingMode.HALF_UP).doubleValue());
-		return Math.round(prevDistance * Math.sin(distAngle));
+		if(prevDistance.subtract(baseDistance).equals(currentDistance)
+		||currentDistance.subtract(baseDistance).equals(prevDistance))
+			return Double.MAX_VALUE/10;
+
+		final BigDecimal semiPerimeter=currentDistance.add(prevDistance).add(baseDistance).divide(TWO);
+		final BigDecimal areaOfTriangle=BigDecimal.valueOf(CMath.sqrt(CMath.abs(
+				semiPerimeter.multiply(semiPerimeter.subtract(currentDistance))
+							.multiply(semiPerimeter.subtract(baseDistance))
+							.multiply(semiPerimeter.subtract(prevDistance)).doubleValue())));
+		return TWO.multiply(areaOfTriangle).divide(baseDistance).doubleValue();
 	}
 }

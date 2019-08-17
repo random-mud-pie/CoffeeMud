@@ -248,19 +248,22 @@ public class Auction extends Channel implements Tickable
 				sb=CMParms.combine(commands,0);
 			final MOB M=getLiveData().getHighBidderMob();
 			final Triad<String,Double,Long> bidObjs=CMLib.english().parseMoneyStringSDL(mob,sb,getLiveData().getCurrency());
-			final String currency=bidObjs.first;
-			final double amt=CMath.mul(bidObjs.second.doubleValue(),bidObjs.third.doubleValue());
-			final String[] resp=CMLib.coffeeShops().bid(mob,amt,currency,getLiveData(),getLiveData().getAuctionedItem(),V);
-			if(resp!=null)
+			if(bidObjs != null)
 			{
-				if(resp[0]!=null)
-					mob.tell(resp[0]);
-				if((resp[1]!=null)&&(M!=null))
-					M.tell(resp[1]);
+				final String currency=bidObjs.first;
+				final double amt=CMath.mul(bidObjs.second.doubleValue(),bidObjs.third.doubleValue());
+				final String[] resp=CMLib.coffeeShops().bid(mob,amt,currency,getLiveData(),getLiveData().getAuctionedItem(),V);
+				if(resp!=null)
+				{
+					if(resp[0]!=null)
+						mob.tell(resp[0]);
+					if((resp[1]!=null)&&(M!=null))
+						M.tell(resp[1]);
+				}
+				if((V.size()>2)
+				&&(getLiveData().getAuctioningMob()!=null))
+					getLiveData().getAuctioningMob().doCommand(V,MUDCmdProcessor.METAFLAG_FORCED);
 			}
-			if((V.size()>2)
-			&&(getLiveData().getAuctioningMob()!=null))
-				getLiveData().getAuctioningMob().doCommand(V,MUDCmdProcessor.METAFLAG_FORCED);
 		}
 		return true;
 	}
@@ -396,6 +399,11 @@ public class Auction extends Channel implements Tickable
 				return false;
 			}
 			final String amount=CMParms.combine(commands,0);
+			if(amount.trim().equals("0")||(amount.startsWith("0 ")))
+			{
+				mob.tell(L("Bid how much?"));
+				return false;
+			}
 			doLiveAuction(mob,new XVector<String>(amount),null);
 			return true;
 		}

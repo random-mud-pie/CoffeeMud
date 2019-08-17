@@ -625,7 +625,7 @@ public class WeatherAffects extends PuddleMaker
 							if((R.domainType()&Room.INDOORS)>0)
 							{
 								if((R.getArea()!=null)
-								&& CMath.div(R.getArea().getAreaIStats()[Area.Stats.INDOOR_ROOMS.ordinal()],R.getArea().properSize())<0.90)
+								&& CMath.div(R.getArea().getAreaIStats()[Area.Stats.INDOOR_ROOMS.ordinal()],R.getArea().getAreaIStats()[Area.Stats.COUNTABLE_ROOMS.ordinal()])<0.90)
 									mob.tell(L("^JA thunderous rumble and CRACK of lightning can be heard outside.^?@x1",CMLib.protocol().msp("thunder.wav",40)));
 							}
 							else
@@ -1004,7 +1004,7 @@ public class WeatherAffects extends PuddleMaker
 				if(CMLib.dice().rollPercentage()<rustChance)
 				{
 					final int weatherType=C.weatherType(R);
-					final Vector<Item> rustThese=new Vector<Item>();
+					final List<Item> rustThese=new ArrayList<Item>();
 					for(int i=0;i<M.numItems();i++)
 					{
 						final Item I=M.getItem(i);
@@ -1015,7 +1015,7 @@ public class WeatherAffects extends PuddleMaker
 							if((((I.material()&RawMaterial.MATERIAL_MASK)==RawMaterial.MATERIAL_METAL))
 							&&(I.subjectToWearAndTear())
 							&&((CMLib.dice().rollPercentage()>I.phyStats().ability()*25)))
-								rustThese.addElement(I);
+								rustThese.add(I);
 							else
 							if(I.amWearingAt(Wearable.WORN_ABOUT_BODY)
 							&&(((I.material()&RawMaterial.MATERIAL_MASK)!=RawMaterial.MATERIAL_METAL)))
@@ -1027,7 +1027,7 @@ public class WeatherAffects extends PuddleMaker
 					}
 					for(int i=0;i<rustThese.size();i++)
 					{
-						final Item I=rustThese.elementAt(i);
+						final Item I=rustThese.get(i);
 						CMLib.combat().postItemDamage(M, I, null, 1, CMMsg.TYP_WATER, (weatherType!=0)?"<T-NAME> rusts.":"<T-NAME> rusts in the water.");
 					}
 				}

@@ -218,7 +218,8 @@ public class CMProps extends Properties
 		CLANTROPMONTHLYAREA,
 		CLANTROPMONTHLYLVLS,
 		CLANTROPMONTHLYCP,
-		CLANTROPMONTHLYMB
+		CLANTROPMONTHLYMB,
+		MANACOMPOUND_RULES
 	}
 
 	/**
@@ -327,10 +328,14 @@ public class CMProps extends Properties
 		RP_SOCIAL_PC,
 		RP_SOCIAL_NPC,
 		RP_SOCIAL_OTH,
+		RP_EMOTE_PC,
+		RP_EMOTE_NPC,
+		RP_EMOTE_OTH,
 		RP_GOAFK,
-		MANACOMPOUND_TICKS,
-		MANACOMPOUND_PCTPENALTY,
-		MANACOMPOUND_AMTPENALTY,
+		RP_CHANNEL,
+		RP_CHANNEL_NAMED,
+		MAXITEMSWORN,
+		MAXWEARPERLOC,
 		;
 
 		public static final int	EXVIEW_DEFAULT		= 0;
@@ -563,6 +568,7 @@ public class CMProps extends Properties
 	protected final List<String> channelFilter		= new Vector<String>();
 	protected final List<String> emoteFilter		= new Vector<String>();
 	protected final List<String> poseFilter			= new Vector<String>();
+	protected final Set<String>	 rpChannels			= new TreeSet<String>();
 	protected String[][]		 statCodeExtensions = null;
 	protected int				 pkillLevelDiff		= 26;
 	protected boolean			 loaded				= false;
@@ -2351,31 +2357,8 @@ public class CMProps extends Properties
 			setIntVar(Int.MANACONSUMEAMT,-200);
 		else
 			setIntVar(Int.MANACONSUMEAMT,CMath.s_int(getStr("MANACONSUMEAMT").trim()));
+		setUpLowVar(Str.MANACOMPOUND_RULES,getStr("MANACOMPOUND"));
 		String s;
-		s=getStr("MANACOMPOUND");
-		setIntVar(Int.MANACOMPOUND_PCTPENALTY,0);
-		setIntVar(Int.MANACOMPOUND_AMTPENALTY,0);
-		setIntVar(Int.MANACOMPOUND_TICKS,0);
-		if(s.trim().length()>0)
-		{
-			for(final String entry : CMParms.parseSemicolons(s, true))
-			{
-				final List<String> eparts = CMParms.parseSpaces(entry,true);
-				if(eparts.size()>1)
-				{
-					setIntVar(Int.MANACOMPOUND_TICKS,CMath.s_int(eparts.get(0)));
-					for(int i=1;i<eparts.size();i++)
-					{
-						final String epart=eparts.get(i);
-						if(CMath.isPct(epart))
-							setIntVar(Int.MANACOMPOUND_PCTPENALTY,CMath.s_int(epart.substring(0,epart.length()-1)));
-						else
-						if(CMath.isInteger(epart))
-							setIntVar(Int.MANACOMPOUND_AMTPENALTY,CMath.s_int(epart));
-					}
-				}
-			}
-		}
 		s=getStr("COMBATSYSTEM");
 		if("queue".equalsIgnoreCase(s))
 			setIntVar(Int.COMBATSYSTEM,CombatLibrary.CombatSystem.QUEUE.ordinal());
@@ -2554,6 +2537,8 @@ public class CMProps extends Properties
 			setIntVar(Int.STARTMOVE,CMath.s_int(stateVar));
 
 		setIntVar(Int.MAXITEMSHOWN,getStr("MAXITEMSHOWN"));
+		setIntVar(Int.MAXITEMSWORN,getStr("MAXITEMSWORN"));
+		setIntVar(Int.MAXWEARPERLOC,getStr("MAXWEARPERLOC"),10);
 		setIntVar(Int.MUDSTATE,getStr("MUDSTATE"));
 
 		setUpLowVar(Str.FORMULA_ATTACKADJUSTMENT, getStr("FORMULA_ATTACKADJUSTMENT","(50+@x1+(((@x2-9)/5)*((@x3-9)/5)*((@x3-9)/5))+@x4)-(0.15*@xx*@x5)-(0.15*@xx*@x6)-(0.3*@xx*@x7)"));
@@ -2988,6 +2973,17 @@ public class CMProps extends Properties
 		}
 	}
 
+	/**
+	 * For the CHANNEL-NAMED option in RPAWARDS ini entry, this will check the
+	 * list of those channels for the given name.
+	 * @param named the channel to look for
+	 * @return true if it was CHANNEL-NAMED
+	 */
+	public static final boolean isSpecialRPChannel(final String named)
+	{
+		return p().rpChannels.contains(named.toUpperCase().trim());
+	}
+
 	private static final List<String> getStatCodeExtensions(Class<?> C, final String ID)
 	{
 		final String[][] statCodeExtensions = p().statCodeExtensions;
@@ -3037,6 +3033,7 @@ public class CMProps extends Properties
 
 	private static void parseRPAwards(final String ln)
 	{
+		final CMProps p=CMProps.p();
 		CMProps.setIntVar(Int.RP_AWARD_PCT, 0);
 		CMProps.setIntVar(Int.RP_AWARD_DELAY, 0);
 		CMProps.setIntVar(Int.RP_INTRODUCE_PC, 0);
@@ -3046,7 +3043,13 @@ public class CMProps extends Properties
 		CMProps.setIntVar(Int.RP_SOCIAL_PC, 0);
 		CMProps.setIntVar(Int.RP_SOCIAL_NPC, 0);
 		CMProps.setIntVar(Int.RP_SOCIAL_OTH, 0);
+		CMProps.setIntVar(Int.RP_EMOTE_PC, 0);
+		CMProps.setIntVar(Int.RP_EMOTE_NPC, 0);
+		CMProps.setIntVar(Int.RP_EMOTE_OTH, 0);
 		CMProps.setIntVar(Int.RP_GOAFK, 0);
+		CMProps.setIntVar(Int.RP_CHANNEL, 0);
+		CMProps.setIntVar(Int.RP_CHANNEL_NAMED, 0);
+		p.rpChannels.clear();
 		if(ln.trim().length()==0)
 			return;
 		final List<String> awards=CMParms.parseCommas(ln.trim(), true);
@@ -3090,6 +3093,13 @@ public class CMProps extends Properties
 			else
 			if(!CMath.isInteger(s.substring(x+1).trim()))
 				Log.errOut("Malformed award amount definition ("+s+")");
+			else
+			if(s.startsWith("CHANNEL-NAMED(") && s.endsWith(")"))
+			{
+				for(final String chan : CMParms.parseCommas(s.substring(14,s.length()-1), true))
+					p.rpChannels.add(chan.toUpperCase().trim());
+				CMProps.setIntVar(Int.RP_CHANNEL_NAMED, CMath.s_int(s.substring(x+1).trim()));
+			}
 			else
 			{
 				final Int code=(Int)CMath.s_valueOf(Int.class, "RP_"+s.substring(0,x).replace('-','_'));
@@ -3145,7 +3155,7 @@ public class CMProps extends Properties
 				deferXPPct=deferXPPct/100.0;
 		}
 		CMProps.setIntVar(Int.EXPDEFER_PCT, (int)Math.round(deferXPPct*100.0));
-		if(x<0)
+		if((x<0)||(x==ln.length()))
 			return;
 		ln=ln.substring(x+1).trim();
 		if(!ln.startsWith("("))

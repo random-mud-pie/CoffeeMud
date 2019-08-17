@@ -423,6 +423,7 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 			extraProp=CMStrings.replaceAll(extraProp, "@dir", CMLib.directions().getDirectionName(dir));
 			addEffects(R,R,extraProp);
 		}
+		CMLib.database().DBUpdateRoom(R);
 		return R;
 	}
 
@@ -435,6 +436,7 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 			E=R.getExitInDir(dir);
 			addEffects(E,R,extraProp);
 		}
+		CMLib.database().DBUpdateExits(R);
 		return E;
 	}
 
@@ -446,6 +448,7 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 			extraProp=CMStrings.replaceAll(extraProp, "@dir", CMLib.directions().getDirectionName(dir));
 			removeEffects(R,extraProp);
 		}
+		CMLib.database().DBUpdateRoom(R);
 		return R;
 	}
 
@@ -458,6 +461,7 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 			E=R.getExitInDir(dir);
 			removeEffects(E,extraProp);
 		}
+		CMLib.database().DBUpdateExits(R);
 		return E;
 	}
 
@@ -643,6 +647,8 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 				mob.destroy();
 			}
 			room.destroy();
+			R.clearSky();
+			R.giveASky(0);
 		}
 		return R;
 	}
@@ -1070,7 +1076,8 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 		for(int a=room.numEffects()-1;a>=0;a--)
 		{
 			final Ability A=room.fetchEffect(a);
-			if(A!=null)
+			if((A!=null)
+			&&(!A.ID().equalsIgnoreCase("Prop_Crawlspace")))
 			{
 				room.delEffect(A);
 				R.addEffect(A);
@@ -1367,16 +1374,32 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 		}
 
 		boolean canBuild=CMLib.law().doesOwnThisLand(mob,mob.location());
+		final String allWords=CMParms.combine(commands,0).toUpperCase();
 		for(int r=0;r<data.length;r++)
 		{
 			final Building buildCode = Building.valueOf(data[r][DAT_BUILDCODE]);
-			if((data[r][0].toUpperCase().startsWith(firstWord.toUpperCase()))
+			if((data[r][0].toUpperCase().startsWith(allWords))
 			&&((data[r][DAT_BUILDERMASK].length()==0)
 				||(CMLib.masking().maskCheck(data[r][DAT_BUILDERMASK], mob, false))
 				||CMSecurity.isASysOp(mob)))
 			{
 				doingCode=buildCode;
 				recipe = data[r];
+			}
+		}
+		if((doingCode==null) || (recipe == null))
+		{
+			for(int r=0;r<data.length;r++)
+			{
+				final Building buildCode = Building.valueOf(data[r][DAT_BUILDCODE]);
+				if((data[r][0].toUpperCase().startsWith(firstWord.toUpperCase()))
+				&&((data[r][DAT_BUILDERMASK].length()==0)
+					||(CMLib.masking().maskCheck(data[r][DAT_BUILDERMASK], mob, false))
+					||CMSecurity.isASysOp(mob)))
+				{
+					doingCode=buildCode;
+					recipe = data[r];
+				}
 			}
 		}
 		if((doingCode == null)||(recipe == null))
@@ -1829,7 +1852,7 @@ public class BuildingSkill extends CraftingSkill implements CraftorAbility
 			room = room.getGridParent();
 
 		if((woodRequired>0)&&(idata!=null))
-			CMLib.materials().destroyResourcesValue(mob.location(),woodRequired,idata[0][FOUND_CODE],0,null);
+			CMLib.materials().destroyResourcesValue(mob.location(),woodRequired,idata[0][FOUND_CODE],idata[0][FOUND_SUB],0,0);
 		else
 		if(recipe[DAT_WOODTYPE].equalsIgnoreCase("VALUE"))
 		{

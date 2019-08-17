@@ -414,7 +414,7 @@ public class Sculpting extends EnhancedCraftingSkill implements ItemCraftor, Men
 			verb=L("sculpting @x1",buildingI.name());
 			playSound="metalbat.wav";
 			buildingI.setDisplayText(L("@x1 lies here",itemName));
-			buildingI.setDescription(itemName+". ");
+			buildingI.setDescription(determineDescription(itemName, buildingI.material(), null, null));
 			buildingI.basePhyStats().setWeight(getStandardWeight(woodRequired+compData[CF_AMOUNT],data[1][FOUND_CODE], bundling));
 			buildingI.setBaseValue(CMath.s_int(foundRecipe.get(RCP_VALUE))+(woodRequired*(RawMaterial.CODES.VALUE(data[0][FOUND_CODE]))));
 			buildingI.basePhyStats().setLevel(CMath.s_int(foundRecipe.get(RCP_LEVEL)));
@@ -519,7 +519,7 @@ public class Sculpting extends EnhancedCraftingSkill implements ItemCraftor, Men
 				{
 					if((buildingI.fitsOn(Wearable.WORN_MOUTH))
 					||(((Container)buildingI).containTypes()==Container.CONTAIN_SMOKEABLES))
-						((Container)buildingI).setCapacity(1);
+						((Container)buildingI).setCapacity(((Container)buildingI).basePhyStats().weight()+1);
 					else
 						((Container)buildingI).setCapacity(0);
 				}
@@ -542,7 +542,10 @@ public class Sculpting extends EnhancedCraftingSkill implements ItemCraftor, Men
 			if((componentsFoundList.size() > 0)||(autoGenerate>0))
 				deadMats = new MaterialLibrary.DeadResourceRecord();
 			else
-				deadMats = CMLib.materials().destroyResources(mob.location(),woodRequired,data[0][FOUND_CODE],data[1][FOUND_CODE],null,null);
+			{
+				deadMats = CMLib.materials().destroyResources(mob.location(),woodRequired,
+						data[0][FOUND_CODE],data[0][FOUND_SUB],data[1][FOUND_CODE],data[1][FOUND_SUB]);
+			}
 			final MaterialLibrary.DeadResourceRecord deadComps = CMLib.ableComponents().destroyAbilityComponents(componentsFoundList);
 			addSpells(buildingI,spell,deadMats.lostProps,deadComps.lostProps);
 			final int lostValue=autoGenerate>0?0:(deadMats.lostValue + deadComps.lostValue);

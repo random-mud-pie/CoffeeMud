@@ -49,6 +49,7 @@ public class Generate extends StdCommand
 			{"MOB",CMClass.CMObjectType.MOB},
 			{"ROOM",CMClass.CMObjectType.LOCALE},
 			{"ITEM",CMClass.CMObjectType.ITEM},
+			{"QUEST",CMClass.CMObjectType.WEBMACRO},
 	});
 
 	private final String[]	access	= I(new String[] { "GENERATE" });
@@ -242,6 +243,15 @@ public class Generate extends StdCommand
 				CMLib.percolator().defineReward(piece,definedIDs);
 				V.addAll(CMLib.percolator().findItems(piece, definedIDs));
 				break;
+			case WEBMACRO:
+			{
+				CMLib.percolator().preDefineReward(piece, definedIDs);
+				CMLib.percolator().defineReward(piece,definedIDs);
+				final String s=CMLib.percolator().findString("QUEST", piece, definedIDs);
+				if(s!=null)
+					V.add(s);
+				break;
+			}
 			default:
 				break;
 			}
@@ -291,6 +301,7 @@ public class Generate extends StdCommand
 				{
 					final Area A=(Area)V.get(v);
 					CMLib.map().addArea(A);
+					CMLib.map().registerWorldObjectLoaded(A, null, A);
 					if(save)
 						CMLib.database().DBCreateArea(A);
 					Room R=A.getRoom(A.Name()+"#0");

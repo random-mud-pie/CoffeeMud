@@ -141,6 +141,13 @@ public class CoffeeShops extends StdLibrary implements ShoppingLibrary
 		final StringBuilder str=new StringBuilder("");
 		if(E==null)
 			return str.toString();
+		if(E instanceof Ability)
+		{
+			final StringBuilder text = CMLib.help().getHelpText(E.ID(), viewerM, false);
+			if((text != null)
+			&&(text.length()>0))
+				str.append(text);
+		}
 		if(E instanceof Physical)
 		{
 			str.append("\n\rLevel      : "+((Physical)E).phyStats().level());
@@ -1454,7 +1461,7 @@ public class CoffeeShops extends StdLibrary implements ShoppingLibrary
 		CMLib.commands().postFollow(product,mobFor,false);
 		if(product.amFollowing()==null)
 		{
-			mobFor.tell(L("You cannot accept seem to accept this follower!"));
+			mobFor.tell(L("You cannot seem to accept this follower!"));
 			return false;
 		}
 		return true;
@@ -1698,7 +1705,14 @@ public class CoffeeShops extends StdLibrary implements ShoppingLibrary
 	@Override
 	public boolean ignoreIfNecessary(final MOB mob, final String ignoreMask, final MOB whoIgnores)
 	{
-		if((ignoreMask.length()>0)&&(!CMLib.masking().maskCheck(ignoreMask,mob,false)))
+		if((whoIgnores != null)
+		&&(CMLib.flags().isSleeping(whoIgnores)))
+		{
+			mob.tell(whoIgnores,null,null,L("<S-NAME> appear(s) to be ignoring you."));
+			return false;
+		}
+		if((ignoreMask.length()>0)
+		&&(!CMLib.masking().maskCheck(ignoreMask,mob,false)))
 		{
 			mob.tell(whoIgnores,null,null,L("<S-NAME> appear(s) to be ignoring you."));
 			return false;
@@ -2095,17 +2109,19 @@ public class CoffeeShops extends StdLibrary implements ShoppingLibrary
 	public AuctionData getEnumeratedAuction(final String named, final String auctionHouse)
 	{
 		final List<AuctionData> V=getAuctions(null,auctionHouse);
-		final Vector<Item> V2=new Vector<Item>();
+		final List<Item> V2=new ArrayList<Item>();
 		for(int v=0;v<V.size();v++)
-			V2.addElement(V.get(v).getAuctionedItem());
+			V2.add(V.get(v).getAuctionedItem());
 		Environmental E=CMLib.english().fetchEnvironmental(V2,named,true);
 		if(!(E instanceof Item))
 			E=CMLib.english().fetchEnvironmental(V2,named,false);
 		if(E!=null)
-		for(int v=0;v<V.size();v++)
 		{
-			if(V.get(v).getAuctionedItem()==E)
-				return V.get(v);
+			for(int v=0;v<V.size();v++)
+			{
+				if(V.get(v).getAuctionedItem()==E)
+					return V.get(v);
+			}
 		}
 		return null;
 	}

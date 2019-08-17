@@ -1104,6 +1104,8 @@ public interface MOB extends Rider, DBIdentifiable, PhysicalAgent, ItemPossessor
 		AUTOMAP(true),//24
 		NOBATTLESPAM(false),//25
 		TELNET_GA(false,"TELNET-GA"), // 26
+		ANSI16(false,"16 COLOR"), //27
+		PRIVACY(false), // 28
 		// .. up to /31
 		;
 		private final int bitCode;

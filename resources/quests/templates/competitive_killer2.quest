@@ -85,7 +85,7 @@
 #$QUEST_WINSPEECH_TEXT=($LONG_STRING)=Congratulations! They're dead!
 #
 #Announcer failure:
-#Select what type of speech the announcer will make when noone returns having killed the mobs.
+#Select what type of speech the announcer will make when no one returns having killed the mobs.
 #$QUEST_LOSESPEECH_TYPE=$CHOOSE=QUESTCHAT,MPECHO,SAY,YELL
 #This is what the announcement says.
 #$QUEST_LOSESPEECH_TEXT=($LONG_STRING)=Looks like I'll have wait for the law to get after them.
@@ -96,7 +96,7 @@
 #Killables Area/Room: 
 #Specify below the name of the area that your killerable mob or mobs will be created
 #in and/or the rooms in which the mob or mobs will be created.  You may leave both blank
-#to force the quest manager to create the mobs randomly throughout the world if you link.
+#to force the quest manager to create the mobs randomly throughout the world if you like.
 #Use double-quotes around multi-word areas and room ids/names.  
 #
 #Killables Area:

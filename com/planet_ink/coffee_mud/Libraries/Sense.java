@@ -1745,14 +1745,25 @@ public class Sense extends StdLibrary implements CMFlagLibrary
 	{
 		if(R==null)
 			return false;
-		if((isHidden(R)) && (mob==null))
+		if(isHidden(R))
+		{
+			if(mob!=null)
+			{
+				if((CMSecurity.isASysOp(mob))
+				||(R.getArea().amISubOp(mob.Name())))
+					return true;
+			}
 			return false;
-		if(((!isHidden(R))
-			&&(mob.location()!=null)&&(mob.location().getArea().getTimeObj()==R.getArea().getTimeObj()))
-		||(CMSecurity.isASysOp(mob))
-		||(R.getArea().amISubOp(mob.Name())))
-			return true;
-		return false;
+		}
+		else
+		if((mob!=null)
+		&&(mob.location()!=null)
+		&&(mob.location().getArea().getTimeObj()!=R.getArea().getTimeObj()))
+		{
+			if((mob==null)||(!CMSecurity.isASysOp(mob)))
+				return false;
+		}
+		return true;
 	}
 
 	@Override
@@ -2290,6 +2301,29 @@ public class Sense extends StdLibrary implements CMFlagLibrary
 			}
 		}
 		return false;
+	}
+
+	@Override
+	public List<String> getParents(final Physical thang)
+	{
+		final List<String> parents=new Vector<String>(2);
+		final MOB babe;
+		if(thang instanceof MOB)
+			babe=(MOB)thang;
+		else
+		if(thang instanceof CagedAnimal)
+			babe=((CagedAnimal)thang).unCageMe();
+		else
+			return parents;
+		for(final Enumeration<Tattoo> t= babe.tattoos();t.hasMoreElements();)
+		{
+			final Tattoo T=t.nextElement();
+			if(T.name().startsWith("PARENT:"))
+				parents.add(T.name().substring(7).trim());
+		}
+		if(thang instanceof CagedAnimal)
+			babe.destroy();
+		return parents;
 	}
 
 	@Override

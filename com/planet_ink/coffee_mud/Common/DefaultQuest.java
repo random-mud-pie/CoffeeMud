@@ -4072,7 +4072,6 @@ public class DefaultQuest implements Quest, Tickable, CMObject
 	{
 		if((--waitRemaining)>=0)
 			return false;
-
 		boolean allowedToRun=true;
 		if(runLevel()>=0)
 		{
@@ -4142,6 +4141,7 @@ public class DefaultQuest implements Quest, Tickable, CMObject
 			V.addElement(A4);
 			V.addElement(A4);
 			A4.setProficiency(100);
+			A4.setSavable(false); // because, WHY WOULD IT BE SAVABLE?!
 			mob.addAbility(A4);
 		}
 		synchronized(questState)
@@ -4208,6 +4208,7 @@ public class DefaultQuest implements Quest, Tickable, CMObject
 				A4.startTickDown((MOB)affected,affected,99999);
 			else
 				A4.startTickDown(null,affected,99999);
+			A4.setSavable(false); // because, WHY WOULD IT BE SAVABLE?!
 			A4.makeLongLasting();
 		}
 		synchronized(questState)
@@ -4246,6 +4247,7 @@ public class DefaultQuest implements Quest, Tickable, CMObject
 				return;
 			V.addElement(B);
 			B.setParms(parms);
+			B.setSavable(false); // because, WHY WOULD IT BE SAVABLE?!
 			behaving.addBehavior(B);
 		}
 		B.registerDefaultQuest(name());
